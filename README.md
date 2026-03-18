@@ -13,10 +13,15 @@ No technical knowledge needed -- just run and follow the prompts.
 
 - **Web-based setup wizard** -- no command line needed after launch
 - **Real-time transfer dashboard** with speed charts, progress bars, and ETA
-- **Pause/resume transfers** -- close and re-run to pick up where you left off
+- **Pause/resume/cancel transfers** -- close and re-run to pick up where you left off
+- **Preview before transfer** -- see file count and size before starting
+- **Bandwidth limiting** -- optionally cap upload/download speed
 - **Session tracking** across restarts, with downtime detection
+- **Transfer history** -- view past transfers
 - **Dark and light themes** with one-click toggle
-- **Sound notification** when transfer completes
+- **Progress in browser tab** -- see percentage without switching tabs
+- **Smart error messages** -- translates rclone errors to plain English
+- **Desktop notification** when transfer completes
 - **Single Python file** -- no dependencies beyond Python 3.7+
 - Installs rclone automatically if missing
 

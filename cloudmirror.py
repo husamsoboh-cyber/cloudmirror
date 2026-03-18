@@ -1458,7 +1458,7 @@ HTML = r"""<!DOCTYPE html>
 </div>
 
 <div class="footer" id="footer">
-  CloudMirror Dashboard &middot; Auto-refresh 5s &middot; <span id="footerInfo">--</span>
+  CloudMirror Dashboard &middot; Auto-refresh 5s &middot; <span id="footerInfo">--</span> &middot; <a href="#" onclick="showHistory();return false;" style="color:var(--blue-light);text-decoration:none;">Transfer History</a>
 </div>
 
 </div>
@@ -1637,6 +1637,22 @@ const typeColors = {
 };
 function getTypeColor(ext) { return typeColors[ext] || typeColors.other; }
 function getExtension(fn) { const p=fn.split('.'); return p.length>1?p[p.length-1].toLowerCase():'other'; }
+
+function friendlyError(msg) {
+    const map = [
+        [/403.*rate/i, 'Google Drive rate limit reached. Transfer will resume automatically.'],
+        [/429/i, 'Too many requests. Slowing down automatically.'],
+        [/quota/i, 'Storage quota exceeded. Free up space on the destination.'],
+        [/token.*expired/i, 'Authentication expired. Please reconnect your account.'],
+        [/no such host/i, 'Network error. Check your internet connection.'],
+        [/permission denied/i, 'Permission denied. Check your account access.'],
+        [/not found/i, 'File or folder not found. It may have been moved or deleted.'],
+    ];
+    for (const [pattern, friendly] of map) {
+        if (pattern.test(msg)) return friendly;
+    }
+    return msg;
+}
 
 async function refresh() {
   try {
@@ -1854,7 +1870,11 @@ async function refresh() {
     }
     if (d.error_messages && d.error_messages.length > 0) {
       document.getElementById('errorSection').classList.add('show');
-      document.getElementById('errorList').innerHTML = d.error_messages.map(e => `<div class="error-item">${esc(e)}</div>`).join('');
+      document.getElementById('errorList').innerHTML = d.error_messages.map(e => {
+        const friendly = friendlyError(e);
+        const isAuth = /token|oauth|expired/i.test(e);
+        return `<div class="error-item">${esc(friendly)}${isAuth ? ' <a href="/wizard" style="color:var(--orange);text-decoration:underline;font-size:0.7rem;">Reconnect</a>' : ''}</div>`;
+      }).join('');
     } else {
       document.getElementById('errorSection').classList.remove('show');
     }
@@ -1971,7 +1991,22 @@ async function refresh() {
 
     updateFavicon(pct);
 
-    document.title = `${pct}% - CloudMirror`;
+    document.title = (pct > 0 && pct < 100) ? '[' + pct + '%] CloudMirror' : 'CloudMirror';
+
+    // Smoothed ETA based on average speed
+    if (d.global_transferred_bytes > 0 && d.global_total_bytes > 0 && d.global_elapsed_sec > 0) {
+        const avgBps = d.global_transferred_bytes / d.global_elapsed_sec;
+        const remaining = d.global_total_bytes - d.global_transferred_bytes;
+        if (avgBps > 0 && remaining > 0) {
+            const etaSec = remaining / avgBps;
+            const etaStr = fmtDuration(etaSec);
+            document.getElementById('bpEta').textContent = etaStr;
+            // Finish time
+            const finish = new Date(Date.now() + etaSec * 1000);
+            document.getElementById('finishTime').textContent = 'Finish: ' + finish.toLocaleDateString('ro-RO', {weekday:'short', day:'numeric', month:'short'}) + ', ' + finish.toLocaleTimeString('ro-RO', {hour:'2-digit', minute:'2-digit'});
+        }
+    }
+
     // Daily transfer bar chart
     if (d.daily_stats && d.daily_stats.length > 0) {
       document.getElementById('dailyChartSection').style.display = '';
@@ -2059,6 +2094,8 @@ function toggleTheme() {
   html.setAttribute('data-theme', next);
   localStorage.setItem('cloudmirror-theme', next);
   document.getElementById('themeToggle').textContent = next === 'light' ? '\u2600' : '\u263E';
+  // Clear chart cache so they redraw with new theme colors
+  if (drawAreaChart._cache) drawAreaChart._cache = {};
   // Redraw charts with new colors
   drawAreaChart('speedChart', speedHistory, '#22c55e', 'speedGrad', v => fmtSpeed(v), true);
   drawAreaChart('progressChart', progressHistory, '#3b82f6', 'progGrad', v => v.toFixed(0) + '%', true, 100);
@@ -2145,6 +2182,26 @@ function playNotifSound(freq, dur) {
     osc.start();
     osc.stop(ctx.currentTime + dur);
   } catch(e) {}
+}
+
+async function showHistory() {
+  try {
+    const res = await fetch('/api/history');
+    const data = await res.json();
+    if (!data.length) { showToast('No transfer history found.', 'var(--text-dim)'); return; }
+    let html = '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:300;display:flex;align-items:center;justify-content:center;" onclick="if(event.target===this)this.remove()">';
+    html += '<div style="background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:24px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">';
+    html += '<h3 style="font-size:1rem;font-weight:700;color:var(--text);margin-bottom:16px;">Transfer History</h3>';
+    data.forEach(h => {
+      html += '<div style="padding:10px 0;border-bottom:1px solid var(--card-border);">';
+      html += '<div style="font-weight:600;color:var(--text);font-size:0.85rem;">' + esc(h.label) + '</div>';
+      html += '<div style="font-size:0.7rem;color:var(--text-dim);">' + h.sessions + ' session(s)</div>';
+      html += '</div>';
+    });
+    html += '<button onclick="this.parentElement.parentElement.remove()" style="margin-top:16px;padding:10px 24px;border-radius:8px;border:1px solid var(--card-border);background:var(--card);color:var(--text);cursor:pointer;font-size:0.85rem;">Close</button>';
+    html += '</div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+  } catch(e) { showToast('Could not load history.', 'var(--red)'); }
 }
 
 refresh();
@@ -2578,10 +2635,15 @@ WIZARD_HTML = r'''<!DOCTYPE html>
           </div>
         </div>
       </div>
-      <div class="form-group" style="margin-bottom:0;">
+      <div class="form-group">
         <label class="form-label" for="excludePatterns">Exclude Patterns (optional)</label>
         <input class="form-input" id="excludePatterns" type="text" placeholder="Trash, .Trash, Personal Vault">
         <div class="form-hint">Comma-separated folder names to skip</div>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" for="bwLimit">Bandwidth Limit (optional)</label>
+        <input class="form-input" id="bwLimit" type="text" placeholder="e.g. 10M, 1G, 500K">
+        <div class="form-hint">Limit upload/download speed. Leave empty for unlimited.</div>
       </div>
     </div>
     <div class="btn-row">
@@ -2616,6 +2678,10 @@ WIZARD_HTML = r'''<!DOCTYPE html>
       <div style="text-align:center;padding:12px 16px;margin-bottom:16px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:10px;font-size:0.8rem;color:var(--green);">
         This will <strong>copy</strong> your files. Your originals will stay untouched.
       </div>
+      <button class="btn btn-secondary btn-big" id="previewBtn" onclick="previewTransfer()" style="margin-bottom:12px;">
+        Preview (see what will be copied)
+      </button>
+      <div id="previewResult" style="display:none;margin-bottom:16px;padding:16px;background:var(--bg);border:1px solid var(--card-border);border-radius:12px;font-size:0.85rem;color:var(--text);"></div>
       <button class="btn btn-primary btn-big" id="startBtn" onclick="startTransfer()">
         Start Transfer
       </button>
@@ -2991,6 +3057,7 @@ function buildSummary() {
   const srcSub = document.getElementById('sourceSubfolder').value.trim();
   const dstSub = document.getElementById('destSubfolder').value.trim();
   const excludes = document.getElementById('excludePatterns').value.trim();
+  const bwLimit = document.getElementById('bwLimit').value.trim();
   const speedLabels = {'4': 'Normal (4 files)', '8': 'Fast (8 files)', '16': 'Maximum (16 files)'};
 
   let srcPath = getSourcePath();
@@ -3017,6 +3084,10 @@ function buildSummary() {
     ${excludes ? `<div class="summary-row">
       <span class="summary-label">Excluding</span>
       <span class="summary-value">${esc(excludes)}</span>
+    </div>` : ''}
+    ${bwLimit ? `<div class="summary-row">
+      <span class="summary-label">Bandwidth Limit</span>
+      <span class="summary-value">${esc(bwLimit)}</span>
     </div>` : ''}
   `;
 }
@@ -3047,6 +3118,33 @@ function getDestPath() {
     return n + ':' + (dstSub || '');
   }
   return destName + ':' + (dstSub || '');
+}
+
+async function previewTransfer() {
+  const btn = document.getElementById('previewBtn');
+  btn.disabled = true;
+  btn.textContent = 'Scanning...';
+  const result = document.getElementById('previewResult');
+  try {
+    const resp = await fetch('/api/wizard/preview', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({source: getSourcePath(), dest: getDestPath(), source_type: sourceProvider, dest_type: destProvider})
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      result.style.display = 'block';
+      result.innerHTML = '<strong>' + data.count.toLocaleString() + ' files</strong> (' + data.size + ') will be copied.';
+    } else {
+      result.style.display = 'block';
+      result.innerHTML = 'Could not preview: ' + (data.msg || 'unknown error');
+    }
+  } catch(e) {
+    result.style.display = 'block';
+    result.innerHTML = 'Preview failed. You can still start the transfer.';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Preview (see what will be copied)';
 }
 
 async function startTransfer() {
@@ -3082,7 +3180,8 @@ async function startTransfer() {
         transfers: selectedSpeed,
         excludes: excludeList,
         source_type: sourceProvider,
-        dest_type: destProvider
+        dest_type: destProvider,
+        bw_limit: document.getElementById('bwLimit').value.trim()
       })
     });
     clearTimeout(safetyTimeout);
@@ -3266,6 +3365,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "remotes": get_existing_remotes(),
                 "home_dir": os.path.expanduser("~"),
             })
+        elif self.path == "/api/history":
+            history = []
+            for f in sorted(os.listdir(_CM_DIR)):
+                if f.endswith('_state.json'):
+                    try:
+                        with open(os.path.join(_CM_DIR, f)) as sf:
+                            s = json.load(sf)
+                            history.append({
+                                "id": f.replace('cloudmirror_','').replace('_state.json',''),
+                                "label": s.get("transfer_label", TRANSFER_LABEL),
+                                "sessions": len(s.get("sessions", [])),
+                                "cmd": s.get("rclone_cmd", []),
+                            })
+                    except Exception:
+                        pass
+            self._send_json(history)
         elif self.path == "/dashboard":
             self._send_html(HTML)
         elif self.path == "/wizard":
@@ -3326,6 +3441,30 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return
             name = body.get("name", "")
             self._send_json({"configured": remote_exists(name)})
+        elif self.path == "/api/wizard/preview":
+            body = self._read_body()
+            if body:
+                source = body.get("source", "")
+                try:
+                    result = subprocess.run(["rclone", "size", source, "--json"], capture_output=True, text=True, timeout=60)
+                    if result.returncode == 0:
+                        data = json.loads(result.stdout)
+                        size_bytes = data.get("bytes", 0)
+                        if size_bytes > 1073741824:
+                            size_str = f"{size_bytes/1073741824:.2f} GiB"
+                        elif size_bytes > 1048576:
+                            size_str = f"{size_bytes/1048576:.1f} MiB"
+                        else:
+                            size_str = f"{size_bytes/1024:.0f} KiB"
+                        self._send_json({"ok": True, "count": data.get("count", 0), "size": size_str})
+                    else:
+                        self._send_json({"ok": False, "msg": "Could not scan source"})
+                except subprocess.TimeoutExpired:
+                    self._send_json({"ok": False, "msg": "Scan timed out (source too large)"})
+                except Exception as e:
+                    self._send_json({"ok": False, "msg": str(e)})
+            else:
+                self._send_json({"ok": False, "msg": "Invalid request"}, 400)
         elif self.path == "/api/wizard/start":
             body = self._read_body()
             if body is None:
@@ -3373,6 +3512,7 @@ def start_transfer_from_wizard(body):
     except (ValueError, TypeError):
         transfers = 8
     excludes = body.get("excludes", [])
+    bw_limit = body.get("bw_limit", "")
     source_type = body.get("source_type", "")
     dest_type = body.get("dest_type", "")
 
@@ -3422,10 +3562,14 @@ def start_transfer_from_wizard(body):
         if excl:
             RCLONE_CMD.append(f"--exclude={excl}/**")
 
+    if bw_limit and validate_rclone_input(bw_limit, "bw_limit"):
+        RCLONE_CMD.append(f"--bwlimit={bw_limit}")
+
     # S6: Save RCLONE_CMD to state but strip credential flags
     safe_cmd = [arg for arg in RCLONE_CMD if not any(secret in arg.lower() for secret in ['password', 'pass', 'user', 'token', 'key=', 'secret'])]
     with state_lock:
         state["rclone_cmd"] = safe_cmd
+        state["transfer_label"] = TRANSFER_LABEL
         save_state(state)
 
     try:
