@@ -1,4 +1,39 @@
-"""CloudHop transfer management."""
+"""CloudHop transfer management.
+
+What this module does
+---------------------
+Manages the rclone subprocess lifecycle, parses rclone's log output to track
+progress, and persists session history across restarts.
+
+Threading model
+---------------
+Three locks protect different scopes of mutable state:
+
+- ``state_lock`` (RLock): guards ``self.state`` (the dict written to
+  cloudhop_*_state.json) and ``self.rclone_pid`` / ``self.transfer_active``.
+  Re-entrant so that methods that already hold it can call helpers safely.
+
+- ``transfer_lock`` (Lock): serialises pause / resume / start_transfer so only
+  one of those operations runs at a time.  Prevents a resume racing a pause.
+
+- ``_scan_lock`` (Lock): prevents concurrent calls to
+  ``_scan_full_log_locked``.  The background scanner and an ad-hoc call from
+  ``_pause_locked`` could otherwise both walk the log file simultaneously.
+
+Data flow
+---------
+1. rclone runs as a detached subprocess and writes structured log lines to a
+   file (e.g. ``~/.cloudhop/cloudhop_<id>.log``).
+2. ``background_scanner`` calls ``scan_full_log`` every 30 s.
+   ``scan_full_log`` / ``_scan_full_log_locked`` reads new log bytes
+   (incremental), detects session boundaries, and writes cumulative stats back
+   into ``self.state``.
+3. The HTTP server calls ``parse_current`` every time ``/api/status`` is
+   polled (~every 5 s).  ``parse_current`` reads the last 16 KB of the log
+   for live per-file stats, then combines those with the cumulative session
+   data already computed by ``scan_full_log`` to produce global progress
+   numbers (bytes, files, %, ETA) that span all sessions.
+"""
 
 import os
 import json
@@ -247,7 +282,14 @@ class TransferManager:
     # ---- rclone process management -------------------------------------------
 
     def is_rclone_running(self) -> bool:
-        """Return True if the tracked rclone process is still alive."""
+        """Return True if the tracked rclone process is still alive.
+
+        On Unix, ``os.waitpid(pid, WNOHANG)`` is used first so zombie
+        processes are reaped immediately.  If the PID is not a direct child
+        (e.g. when ``--attach-pid`` was used), we fall back to
+        ``os.kill(pid, 0)`` which probes existence without sending a signal.
+        Windows doesn't have waitpid; the kill-0 fallback handles it there.
+        """
         with self.state_lock:
             pid = self.rclone_pid  # snapshot to avoid race
             if not pid:
@@ -275,14 +317,18 @@ class TransferManager:
     # ---- full log scanner (session detection + chart history) ----------------
 
     def scan_full_log(self) -> None:
-        """Scan the entire log to detect sessions and build cumulative state.
+        """Scan the log to detect sessions and build cumulative state.
 
-        Session detection: rclone resets its elapsed timer on each new run.
-        We detect a new session when elapsed time drops by >50% (meaning
-        rclone restarted).  For each session we track bytes transferred,
-        files done, and elapsed time.  Previous sessions' values are
-        snapshotted *before* the drop so we don't lose progress from
-        earlier runs.
+        Session detection algorithm (implemented in ``_scan_full_log_locked``):
+        rclone resets its ``Elapsed time:`` counter each time it restarts.
+        We scan every ``Elapsed time:`` line; when ``elapsed < prev_elapsed *
+        0.5`` (i.e. the timer dropped by more than half) AND the previous
+        session ran for at least ``MIN_SESSION_ELAPSED_SEC`` (300 s), we
+        treat it as a new session boundary.  The previous session's final
+        stats are snapshotted at the moment of the drop.
+
+        The scan is incremental: ``last_scan_offset`` in state tracks how far
+        we've already read, so subsequent calls only process new bytes.
         """
         with self._scan_lock:
             self._scan_full_log_locked()
@@ -673,7 +719,12 @@ class TransferManager:
             original_files = max(
                 (s.get("final_files_total", 0) or 0) for s in finalized_sessions
             )
-            # Fetch real size in background (only once)
+            # Fetch the authoritative source size by running ``rclone size``
+            # once and caching the result.  This runs in a daemon thread
+            # because it can take minutes for large remotes (e.g. 100 GB+
+            # of cloud storage) and we must not block the log scanner or
+            # the HTTP handler.  ``_size_fetching`` is a simple flag to
+            # prevent spawning a second thread if the first is still running.
             if not self._size_fetching:
                 self._size_fetching = True
 
@@ -939,13 +990,23 @@ class TransferManager:
         return error_msgs[-5:]
 
     def parse_current(self) -> Dict[str, Any]:
-        """Parse current stats from the tail of the log, combined with session state.
+        """Return a snapshot of current transfer state for the dashboard.
 
-        Called every few seconds by the dashboard via ``/api/status``.
-        Reads the last 16 KB of the log (for current rclone stats), then
-        combines those with cumulative session data from
-        :meth:`scan_full_log` to produce global progress numbers that span
-        all sessions.
+        Called on every ``/api/status`` poll (roughly every 5 s).
+
+        Fast path: reads only the last 16 KB of the log to extract the
+        current rclone stats block (speed, ETA, active files, errors).
+
+        Global progress calculation: ``parse_current`` never walks the whole
+        log itself.  Instead it reads the cumulative totals already computed
+        by ``scan_full_log`` (stored in ``self.state``) and adds the current
+        session's partial progress on top:
+
+            global_transferred = cumulative_bytes_from_past_sessions
+                                + current_session_transferred_bytes
+
+        This means the global percentage keeps climbing monotonically even
+        after rclone restarts mid-transfer.
         """
         if not os.path.exists(self.log_file):
             return {
@@ -1184,6 +1245,10 @@ class TransferManager:
             return self._pause_locked()
 
     def _pause_locked(self) -> Dict[str, Any]:
+        # Pause = kill.  rclone has no native pause; we terminate the process
+        # and rely on _resume_locked to restart it from scratch.  rclone's
+        # built-in deduplication (--copy-dest / size+time checks) means it
+        # skips already-transferred files on resume, so no work is lost.
         if not self.rclone_pid:
             return {"ok": False, "msg": "No tracked rclone process"}
         try:
@@ -1211,6 +1276,10 @@ class TransferManager:
             return self._resume_locked()
 
     def _resume_locked(self) -> Dict[str, Any]:
+        # Resume = restart the exact same rclone command that was used to
+        # start the transfer (saved in state["rclone_cmd"]).  rclone will
+        # compare file sizes/mtimes at the destination and skip files that
+        # already exist, continuing from where it left off.
         if not self.rclone_cmd:
             with self.state_lock:
                 self.rclone_cmd = self.state.get("rclone_cmd", [])

@@ -1,3 +1,36 @@
+/*
+ * wizard.js - CloudHop setup wizard
+ *
+ * 6-step wizard flow
+ *   Step 1: Welcome / rclone check
+ *   Step 2: Select source provider
+ *   Step 3: Select destination provider
+ *   Step 4: Speed / advanced options
+ *   Step 5: Connect accounts (OAuth or credentials)
+ *   Step 6: Summary + Start
+ *   goTo(step) handles all step transitions; it runs pre-step hooks
+ *   (e.g. buildConnectStep, buildSummary) before showing the new step.
+ *
+ * State persistence
+ *   The wizard state (current step, provider names, remote names) is
+ *   serialised to sessionStorage on every goTo() call.  An IIFE at the
+ *   bottom of the file restores it on load so a page refresh doesn't reset
+ *   the user's progress.
+ *
+ * OAuth flow (Google Drive, OneDrive, Dropbox)
+ *   connectRemote() POSTs to /api/wizard/configure-remote which runs
+ *   `rclone config create ...`.  For OAuth providers, rclone opens a browser
+ *   tab for the sign-in flow.  Meanwhile, startPolling() polls
+ *   /api/wizard/check-remote every 2 s to detect when rclone writes the token
+ *   to its config file.  The poll times out after 2 minutes and shows a
+ *   "Try again" link.
+ *
+ * Provider keys
+ *   `providerKeys` maps the UI provider identifier (e.g. "drive") to the
+ *   rclone backend type string (e.g. "gdrive") that is passed to
+ *   `rclone config create <name> <type>`.  The remote name used in rclone
+ *   paths (e.g. "gdrive:Photos") is stored in sourceName / destName.
+ */
 function getCsrfToken(){return document.cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith('csrf_token='))?.substring('csrf_token='.length)||''}
 function esc(s) {
   const d = document.createElement('div');

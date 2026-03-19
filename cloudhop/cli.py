@@ -1,4 +1,31 @@
-"""CloudHop CLI entry point."""
+"""CloudHop CLI entry point.
+
+Two operating modes
+-------------------
+Wizard mode (no arguments)
+    ``cloudhop``
+    Opens the browser-based setup wizard.  rclone is not started by the CLI;
+    the wizard POSTs to ``/api/wizard/start`` which launches rclone.
+
+CLI mode (source + destination given)
+    ``cloudhop <source> <dest> [--rclone-flags...]``
+    Builds and immediately starts the rclone command, then opens the
+    dashboard for monitoring.  Any extra ``--flags`` are forwarded verbatim
+    to rclone (e.g. ``--bwlimit=10M``, ``--dry-run``).
+
+Attach mode (``--attach-pid=<pid>``)
+    ``cloudhop --attach-pid=1234 --attach-log=/path/to/rclone.log``
+    Monitors an already-running rclone process that was started externally.
+    CloudHop will not try to pause or restart it, but will parse its log
+    and display live progress on the dashboard.
+
+Port auto-retry
+---------------
+``start_dashboard`` tries to bind to port 8787 (``PORT``).  If that port
+is busy it retries 8788, 8789, 8790, 8791 before giving up.  The chosen
+port is stored in ``CloudHopHandler.actual_port`` so CORS checks use the
+correct origin.
+"""
 import sys
 import signal
 import platform

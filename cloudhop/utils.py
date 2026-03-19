@@ -29,37 +29,82 @@ MAX_TRANSFERS: int = 64
 MAX_HISTORY_ENTRIES: int = 50000
 
 # ─── Compiled regexes ────────────────────────────────────────────────────────
+# All patterns match lines from rclone's --log-level=INFO --stats=10s output.
 
+# Matches: "Transferred:   90.054 GiB / 103.010 GiB, 87%, 12.345 MiB/s"
+# Groups:  (transferred_str, total_str, pct, speed_str)
+# Note: no ETA - used by scan_full_log for history, where ETA is not needed.
 RE_TRANSFERRED_BYTES = re.compile(
     r"Transferred:\s+([\d.]+\s+\S+)\s*/\s*([\d.]+\s+\S+),\s*(\d+)%,\s*([\d.]+\s*\S+/s)"
 )
+
+# Matches: "Transferred:     42 / 1000, 4%"
+# Groups:  (files_done, files_total, pct)
 RE_TRANSFERRED_FILES = re.compile(
     r"Transferred:\s+(\d+)\s*/\s*(\d+),\s*(\d+)%"
 )
+
+# Matches: "Elapsed time:     14h59m30.0s"
 RE_ELAPSED = re.compile(r"Elapsed time:\s*(.+)")
+
+# Matches: "Errors:          3"
 RE_ERRORS = re.compile(r"Errors:\s+(\d+)")
+
+# Matches the speed component of a stats line: "12.345 MiB/s"
+# Used to convert speed strings to MiB for chart history.
 RE_SPEED = re.compile(r"([\d.]+)\s*([KMGT]i?B)/s", re.I)
+
+# Matches a file-copied event: "2024/01/15 13:01:22 INFO  : myfile.pdf: Copied ("
 RE_COPIED = re.compile(r"INFO\s+:\s+(.+?):\s+Copied\s+\(")
+
+# Active transfer with full info: "* filename.mp4:  45% /1.2GiB, 8.5MiB/s, 2m30s"
+# Groups: (name, pct, size, speed, eta)
 RE_ACTIVE = re.compile(
     r"\*\s+(.+?):\s+(\d+)%\s*/(\S+),\s*(\S+/s),\s*(\S+)"
 )
+
+# Active transfer without ETA: "* filename.mp4:  45% /1.2GiB, 8.5MiB/s"
+# Groups: (name, pct, size, speed)
 RE_ACTIVE2 = re.compile(
     r"\*\s+(.+?):\s+(\d+)%\s*/(\S+),\s*(\S+/s)"
 )
+
+# Active transfer just started, no progress yet: "* filename.mp4: transferring"
 RE_ACTIVE3 = re.compile(r"\*\s+(.+?):\s+transferring")
+
+# Like RE_TRANSFERRED_BYTES but also captures ETA - used in parse_current
+# for the live stats block.
+# Matches: "Transferred:   90 GiB / 103 GiB, 87%, 12 MiB/s, ETA 1h30m"
+# Groups:  (transferred_str, total_str, pct, speed_str, eta_str)
 RE_FULL_TRANSFER_ETA = re.compile(
     r"Transferred:\s+([\d.]+\s+\S+)\s*/\s*([\d.]+\s+\S+),\s*(\d+)%,\s*([\d.]+\s*\S+/s),\s*ETA\s*(\S+)"
 )
+
+# Matches: "Checks:       500 / 1000, 50%, Listed 200"
+# Groups:  (checks_done, checks_total, listed)
 RE_CHECKS_LISTED = re.compile(
     r"Checks:\s+(\d+)\s*/\s*(\d+).+Listed\s+(\d+)"
 )
+
+# Like RE_COPIED but captures the timestamp for "recently copied" list.
+# Matches: "2024/01/15 13:01:22 INFO  : myfile.pdf: Copied ("
+# Groups:  (timestamp, filename)
 RE_COPIED_WITH_TS = re.compile(
     r"(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+INFO\s+:\s+(.+?):\s+Copied\s+\("
 )
+
+# Matches error lines to extract the human-readable message portion.
+# Matches: "13:01:22 ERROR : something went wrong"
 RE_ERROR_MSG = re.compile(r"\d{2}:\d{2}:\d{2}\s+ERROR\s+:\s+(.+)")
+
+# Matches the leading timestamp on any rclone log line.
+# Matches: "2024/01/15 13:01:22"
 RE_TIMESTAMP = re.compile(
     r"(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})"
 )
+
+# Same as RE_TRANSFERRED_FILES - used specifically to build the files chart
+# history array (separate from the files progress display).
 RE_FILES_HIST = re.compile(
     r"Transferred:\s+(\d+)\s*/\s*\d+,\s*\d+%"
 )

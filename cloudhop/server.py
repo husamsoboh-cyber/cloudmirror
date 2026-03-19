@@ -1,4 +1,35 @@
-"""CloudHop HTTP server."""
+"""CloudHop HTTP server.
+
+Routes overview
+---------------
+GET  /                        Redirect: dashboard if transfer is active, wizard otherwise
+GET  /dashboard               Transfer monitoring UI
+GET  /wizard                  Setup wizard UI
+GET  /api/status              Live transfer stats (polled every 5 s by dashboard.js)
+GET  /api/wizard/status       rclone install check + list of existing remotes
+GET  /api/history             List of past transfer state files from ~/.cloudhop/
+GET  /static/<file>           Serves CSS/JS from the package ``static/`` directory
+
+POST /api/pause               Kill the rclone process (pause = kill; resume = restart)
+POST /api/resume              Restart rclone using the last saved command
+POST /api/wizard/check-rclone Install rclone if missing
+POST /api/wizard/configure-remote  Create an rclone remote (OAuth or credentials)
+POST /api/wizard/check-remote      Poll whether a remote is now configured (OAuth flow)
+POST /api/wizard/preview      Run ``rclone size`` to estimate transfer scope
+POST /api/wizard/start        Validate inputs, build rclone command, launch subprocess
+
+Security model
+--------------
+- Server binds to ``127.0.0.1`` only, so it is never reachable from the network.
+- ``_check_host`` rejects any request whose ``Host`` header is not
+  ``localhost`` or ``127.0.0.1``, blocking DNS-rebinding attacks.
+- Every mutating POST endpoint requires the ``X-CSRF-Token`` header to match
+  a random token that was set as a ``SameSite=Strict`` cookie on page load.
+  ``hmac.compare_digest`` is used to prevent timing attacks.
+- CORS is restricted to the exact localhost origin so malicious pages on
+  other ports cannot make cross-origin requests.
+- Static files are served with a directory-traversal check (``os.path.realpath``).
+"""
 import http.server
 import json
 import hmac

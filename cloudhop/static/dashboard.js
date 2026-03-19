@@ -1,3 +1,30 @@
+/*
+ * dashboard.js - CloudHop transfer monitoring dashboard
+ *
+ * Auto-refresh
+ *   refresh() is called immediately on load, then every 5 s via setInterval
+ *   (stored in `refreshInterval`).  When the transfer completes, the interval
+ *   slows to 30 s.  On fetch failure 3+ times in a row, a "connection lost"
+ *   banner is shown.
+ *
+ * Chart rendering
+ *   drawAreaChart(svgId, data, ...) renders an SVG area chart directly by
+ *   building an HTML string and assigning it to svg.innerHTML.  null values
+ *   in the data array represent session gaps (rclone restarts); the chart
+ *   connects across them with a continuous line.  A simple cache key
+ *   (svgId + dimensions + last 5 data points) skips redundant redraws.
+ *
+ * Theme toggle
+ *   toggleTheme() switches the data-theme attribute on <html> between "dark"
+ *   and "light".  CSS transitions are disabled for two animation frames during
+ *   the switch so cards and the header don't flash grey before the new
+ *   background colour is applied.
+ *
+ * Completion overlay
+ *   showCompletionScreen(d) renders a full-screen overlay with transfer stats.
+ *   `completionShown` (boolean) ensures it appears exactly once per page load,
+ *   even if refresh() is called multiple times after the transfer finishes.
+ */
 function getCsrfToken(){return document.cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith('csrf_token='))?.substring('csrf_token='.length)||''}
 function esc(s) {
   const d = document.createElement('div');
