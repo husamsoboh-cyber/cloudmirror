@@ -63,9 +63,16 @@ jobs:
 
       - name: Download rclone
         run: |
-          curl -LO https://downloads.rclone.org/rclone-current-osx-amd64.zip
-          unzip rclone-current-osx-amd64.zip
-          RCLONE_BIN=$(find rclone-*-osx-amd64 -name "rclone" -type f | head -1)
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "arm64" ]; then
+            curl -LO https://downloads.rclone.org/rclone-current-osx-arm64.zip
+            unzip rclone-current-osx-arm64.zip
+            RCLONE_BIN=$(find rclone-*-osx-arm64 -name "rclone" -type f | head -1)
+          else
+            curl -LO https://downloads.rclone.org/rclone-current-osx-amd64.zip
+            unzip rclone-current-osx-amd64.zip
+            RCLONE_BIN=$(find rclone-*-osx-amd64 -name "rclone" -type f | head -1)
+          fi
           cp "$RCLONE_BIN" rclone
 
       - name: Build with PyInstaller
@@ -73,16 +80,22 @@ jobs:
           pyinstaller --name CloudHop --onedir --noconsole --add-data "cloudhop/templates:cloudhop/templates" --add-data "cloudhop/static:cloudhop/static" --add-data "rclone:." --runtime-hook rthook_cloudhop.py cloudhop_main.py
 
       - name: Create DMG
-        run: hdiutil create -volname "CloudHop" -srcfolder dist/CloudHop -ov -format UDZO CloudHop-${{ github.ref_name }}-mac.dmg
+        run: |
+          # hdiutil can fail with "Resource busy" on CI - retry with delay
+          for i in 1 2 3; do
+            hdiutil create -volname "CloudHop" -srcfolder dist/CloudHop -ov -format UDZO CloudHop-mac.dmg && break
+            echo "Attempt $i failed, waiting..."
+            sleep 5
+          done
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: mac-installer
-          path: CloudHop-${{ github.ref_name }}-mac.dmg
+          path: CloudHop-mac.dmg
 
       - name: Upload to Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: CloudHop-${{ github.ref_name }}-mac.dmg
+          files: CloudHop-mac.dmg
