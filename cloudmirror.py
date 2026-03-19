@@ -99,7 +99,7 @@ RECENT_FILES_MAX_CHUNK = 2000000
 ERROR_TAIL_BYTES = 100000
 CHART_DOWNSAMPLE_TARGET = 200
 SCANNER_INTERVAL_SEC = 30
-MIN_SESSION_ELAPSED_SEC = 60
+MIN_SESSION_ELAPSED_SEC = 300
 MAX_REQUEST_BODY_BYTES = 10240
 MIN_DOWNTIME_GAP_SEC = 60
 RCLONE_SIZE_TIMEOUT_SEC = 600
@@ -529,6 +529,7 @@ def scan_full_log():
             session_max_bytes = state.get("_running_session_max_bytes", 0)
             session_max_files = state.get("_running_session_max_files", 0)
             first_session_total = state.get("_running_first_session_total", 0)
+            cur_transferred = 0
     else:
         sessions = []
         current_session = None
@@ -550,6 +551,7 @@ def scan_full_log():
         session_max_bytes = 0
         session_max_files = 0
         first_session_total = 0
+        cur_transferred = 0
 
     for line in lines:
         ts_match = RE_TIMESTAMP.match(line)
@@ -606,7 +608,8 @@ def scan_full_log():
             elapsed_sec = parse_elapsed(elapsed_str)
 
             # Chart history: session boundary detection for charts
-            if chart_prev_el > MIN_SESSION_ELAPSED_SEC and elapsed_sec < chart_prev_el * 0.5:
+            bytes_changed = abs(cur_transferred - prev_transferred_bytes) > 1_000_000 if cur_transferred else True
+            if chart_prev_el > MIN_SESSION_ELAPSED_SEC and elapsed_sec < chart_prev_el * 0.5 and bytes_changed:
                 cumul_bytes_offset += session_max_bytes
                 cumul_files_offset += session_max_files
                 session_max_bytes = 0
@@ -619,7 +622,9 @@ def scan_full_log():
             # Session boundary: elapsed dropped >50% means rclone restarted.
             # Finalize the previous session with its pre-reset values and
             # back-calculate the new session's true start time.
-            if prev_elapsed > MIN_SESSION_ELAPSED_SEC and elapsed_sec < prev_elapsed * 0.5:
+            # Also require transferred bytes changed by >1MB to avoid false boundaries.
+            session_bytes_changed = abs(cur_transferred - prev_transferred_bytes) > 1_000_000 if cur_transferred else True
+            if prev_elapsed > MIN_SESSION_ELAPSED_SEC and elapsed_sec < prev_elapsed * 0.5 and session_bytes_changed:
                 if current_session:
                     current_session["end_time"] = current_session.get("last_ts", "")
                     current_session["final_elapsed_sec"] = prev_elapsed
@@ -961,6 +966,9 @@ def parse_current():
         else:
             global_total = cur_total_bytes + cumul_bytes
 
+        if global_transferred > global_total and global_total > 0:
+            global_total = global_transferred
+
         global_files_done = cumul_files + result.get("session_files_done", 0)
         if orig_files > 0:
             global_files_total = orig_files
@@ -978,6 +986,7 @@ def parse_current():
         files_pct = 0
         if global_files_total > 0:
             files_pct = round(global_files_done / global_files_total * 100, 1)
+            files_pct = min(files_pct, 100)
 
         result["global_transferred"] = fmt_bytes(global_transferred)
         result["global_transferred_bytes"] = global_transferred
@@ -1047,7 +1056,7 @@ def parse_current():
                 result["wall_clock"] = fmt_duration(wall_sec)
                 result["wall_clock_sec"] = wall_sec
                 if wall_sec > 0:
-                    result["uptime_pct"] = round(global_elapsed_sec / wall_sec * 100, 1)
+                    result["uptime_pct"] = round(min(global_elapsed_sec / wall_sec * 100, 100), 1)
                 else:
                     result["uptime_pct"] = 0
             except Exception:
@@ -1065,6 +1074,12 @@ def parse_current():
             if s_start:
                 day = s_start[:10]
                 daily[day] = daily.get(day, 0) + s_bytes
+        # Sanity check: cap each day's total so it doesn't exceed global transferred
+        global_xfer = result.get("global_transferred_bytes", 0)
+        if global_xfer > 0:
+            for day_key in daily:
+                if daily[day_key] > global_xfer:
+                    daily[day_key] = global_xfer
         result["daily_stats"] = [
             {"day": d.replace("/", "-"), "bytes": b, "gib": round(b / (1024**3), 1)}
             for d, b in sorted(daily.items())
@@ -3050,14 +3065,6 @@ async function goTo(step) {
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   document.getElementById('step' + step).classList.add('active');
 
-
-function toggleAdvanced() {
-    const content = document.getElementById('advancedContent');
-    const arrow = document.getElementById('advArrow');
-    content.classList.toggle('open');
-    arrow.classList.toggle('open');
-}
-
   const dots = document.querySelectorAll('.dot');
   dots.forEach((d, i) => {
     d.classList.remove('active', 'done');
@@ -3072,6 +3079,13 @@ function toggleAdvanced() {
       destProvider, destName, destDisplayName, selectedSpeed
     }));
   } catch(e) {}
+}
+
+function toggleAdvanced() {
+    const content = document.getElementById('advancedContent');
+    const arrow = document.getElementById('advArrow');
+    content.classList.toggle('open');
+    arrow.classList.toggle('open');
 }
 
 // Restore wizard state after refresh
