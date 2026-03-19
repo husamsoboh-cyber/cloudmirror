@@ -512,7 +512,7 @@ def scan_full_log():
                 current_session = dict(current_session)
             prev_elapsed = state.get("_running_prev_elapsed", -1)
             file_types = dict(state.get("all_file_types", {}))
-            total_copied = state.get("total_copied_count", 0)
+            total_copied_set = set(state.get("_running_copied_files_set", []))
             last_ts = state.get("_running_last_ts", None)
             prev_ts = state.get("_running_prev_ts", None)
             prev_transferred_bytes = state.get("_running_prev_transferred_bytes", 0)
@@ -535,7 +535,7 @@ def scan_full_log():
         current_session = None
         prev_elapsed = -1
         file_types = {}
-        total_copied = 0
+        total_copied_set = set()
         last_ts = None
         prev_ts = None
         prev_transferred_bytes = 0
@@ -684,7 +684,7 @@ def scan_full_log():
         m_copied = RE_COPIED.search(line)
         if m_copied:
             fname = m_copied.group(1).strip()
-            total_copied += 1
+            total_copied_set.add(fname)
             ext_parts = fname.rsplit(".", 1)
             if len(ext_parts) > 1:
                 ext = ext_parts[1].lower()
@@ -701,17 +701,25 @@ def scan_full_log():
         finalized_sessions.append(cs_copy)
 
     # FIX 4: Deduplicate sessions with nearly identical start times (within
-    # 60 seconds). These are false boundaries from incremental scanning.
+    # 300 seconds) or sessions that transferred < 1MB (likely false restarts).
     if len(finalized_sessions) > 1:
         deduped = [finalized_sessions[0]]
         for s in finalized_sessions[1:]:
+            # Merge sessions that transferred < 1MB (false restarts)
+            if s.get("final_transferred_bytes", 0) < 1_000_000 and s is not finalized_sessions[-1]:
+                deduped[-1]["end_time"] = s.get("end_time", deduped[-1].get("end_time", ""))
+                deduped[-1]["final_elapsed_sec"] = max(
+                    deduped[-1].get("final_elapsed_sec", 0),
+                    s.get("final_elapsed_sec", 0),
+                )
+                continue
             prev_start = deduped[-1].get("start_time", "")
             cur_start = s.get("start_time", "")
             if prev_start and cur_start:
                 try:
                     t_prev = datetime.strptime(prev_start, "%Y/%m/%d %H:%M:%S")
                     t_cur = datetime.strptime(cur_start, "%Y/%m/%d %H:%M:%S")
-                    if abs((t_cur - t_prev).total_seconds()) < 60:
+                    if abs((t_cur - t_prev).total_seconds()) < 300:
                         # Merge: keep the one with more transferred bytes
                         if s.get("final_transferred_bytes", 0) > deduped[-1].get("final_transferred_bytes", 0):
                             s["start_time"] = deduped[-1].get("start_time", s.get("start_time", ""))
@@ -826,7 +834,8 @@ def scan_full_log():
         state["original_total_bytes"] = original_total
         state["original_total_files"] = original_files
         state["all_file_types"] = file_types
-        state["total_copied_count"] = total_copied
+        state["total_copied_count"] = len(total_copied_set)
+        state["_running_copied_files_set"] = list(total_copied_set)
 
         # Cache chart history for parse_current() to read cheaply
         state["cached_speed_history"] = downsample(speed_hist)
@@ -1198,6 +1207,7 @@ HTML = r"""<!DOCTYPE html>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 /* ========== CSS VARIABLES ========== */
 :root {
   --primary: #6366f1;
@@ -1238,7 +1248,7 @@ HTML = r"""<!DOCTYPE html>
   --shimmer: rgba(255,255,255,0.1);
   --shadow: 0 1px 3px rgba(0,0,0,0.4);
   --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
-  --noise-opacity: 0.03;
+  --noise-opacity: 0.05;
   --row-alt: rgba(255,255,255,0.02);
 }
 
@@ -1407,7 +1417,7 @@ body::before {
 .big-track::after {
   content: ''; position: absolute; bottom: -6px; left: 0; right: 0;
   height: 16px; border-radius: 8px;
-  background: linear-gradient(90deg, rgba(var(--primary-rgb),0.3), rgba(var(--secondary-rgb),0.3));
+  background: linear-gradient(90deg, rgba(var(--primary-rgb),0.5), rgba(var(--secondary-rgb),0.5));
   filter: blur(12px); pointer-events: none;
 }
 .prev-fill {
@@ -1417,9 +1427,9 @@ body::before {
 }
 
 @keyframes shimmer {
-  0% { opacity: 0.3; }
+  0% { opacity: 0.5; }
   50% { opacity: 0.8; }
-  100% { opacity: 0.3; }
+  100% { opacity: 0.5; }
 }
 
 .big-bars { display: flex; gap: 16px; margin-top: 20px; }
@@ -1452,9 +1462,9 @@ body::before {
 }
 .stat-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 /* Stat card color classes: indigo + cyan only */
-.stat-value.green, .stat-value.blue, .stat-value.purple, .stat-value.cyan { color: var(--primary); }
-.stat-value.orange, .stat-value.yellow, .stat-value.pink { color: var(--secondary); }
-.stat-value.red { color: var(--red); }
+.stat-value.green, .stat-value.blue, .stat-value.purple, .stat-value.cyan { color: var(--text) !important; }
+.stat-value.orange, .stat-value.yellow, .stat-value.pink { color: var(--text) !important; }
+.stat-value.red { color: var(--red) !important; }
 
 /* ========== SESSION TIMELINE ========== */
 .timeline-section {
@@ -1717,14 +1727,9 @@ body::before {
       <div class="status-dot" style="animation:none;background:var(--text-dim)"></div>
       <span id="statusText">Loading...</span>
     </div>
-    <div class="session-badge" id="sessionBadge">Session 1</div>
-    <button class="ctrl-btn pause" id="btnPause" onclick="doAction('pause')">Pause</button>
-    <button class="ctrl-btn resume" id="btnResume" onclick="doAction('resume')" style="display:none">Resume</button>
-    <button class="ctrl-btn" id="btnCancel" onclick="cancelTransfer()" style="background:rgba(239,68,68,0.08);color:var(--red);border:1px solid rgba(239,68,68,0.2);font-size:0.65rem;">Cancel</button>
-    <a href="/wizard" class="ctrl-btn" id="btnNewTransfer" style="background:rgba(167,139,250,0.15);color:var(--purple);border:1px solid rgba(167,139,250,0.3);text-decoration:none;padding:6px 18px;font-size:0.75rem;">New Transfer</a>
   </div>
   <div class="header-right" id="headerRight" style="display:flex;align-items:center;gap:12px;">
-    <div id="headerTimers">
+    <div id="headerTimers" style="font-size:11px;">
       <div>Wall time: <span id="wallClock" style="color:var(--text)">--</span></div>
       <div>Uptime: <span id="uptimePct" style="color:var(--green)">--</span></div>
       <div>Updated: <span id="lastUpdate">--</span></div>
@@ -1778,6 +1783,15 @@ body::before {
       <div class="sub-track"><div class="sub-fill checks" id="checksBar" style="width:0%"></div></div>
     </div>
   </div>
+</div>
+
+<!-- Floating control bar -->
+<div id="controlBar" style="display:flex;align-items:center;justify-content:center;gap:10px;margin:12px 0 8px 0;flex-wrap:wrap;">
+  <div class="session-badge" id="sessionBadge">Session 1</div>
+  <button class="ctrl-btn pause" id="btnPause" onclick="doAction('pause')">Pause</button>
+  <button class="ctrl-btn resume" id="btnResume" onclick="doAction('resume')" style="display:none">Resume</button>
+  <button class="ctrl-btn" id="btnCancel" onclick="cancelTransfer()" style="background:rgba(239,68,68,0.08);color:var(--red);border:1px solid rgba(239,68,68,0.2);font-size:0.65rem;">Cancel</button>
+  <a href="/wizard" class="ctrl-btn" id="btnNewTransfer" style="background:rgba(167,139,250,0.15);color:var(--purple);border:1px solid rgba(167,139,250,0.3);text-decoration:none;padding:6px 18px;font-size:0.75rem;">New Transfer</a>
 </div>
 
 <!-- Stats -->
@@ -2223,7 +2237,10 @@ async function refresh() {
     document.getElementById('bigBar').setAttribute('aria-valuenow', pct);
     if (d.global_transferred) document.getElementById('bpTransferred').textContent = d.global_transferred;
     if (d.global_total) document.getElementById('bpTotal').textContent = d.global_total;
-    if (d.eta) {
+    if (pct >= 100) {
+      document.getElementById('bpEta').textContent = 'Complete';
+      document.getElementById('finishTime').textContent = '';
+    } else if (d.eta) {
       document.getElementById('bpEta').textContent = fmtEta(d.eta);
       const etaStr = d.eta;
       let etaSec = 0;
@@ -2295,7 +2312,7 @@ async function refresh() {
     if (d.global_transferred_bytes > 0 && d.global_elapsed_sec > 0) {
       const avgMbs = (d.global_transferred_bytes / 1024 / 1024) / d.global_elapsed_sec;
       document.getElementById('avgSpeed').textContent = fmtSpeed(avgMbs);
-      document.getElementById('avgSpeedSub').textContent = `across ${d.session_num || 1} session(s)`;
+      document.getElementById('avgSpeedSub').textContent = `across ${d.sessions ? d.sessions.length : (d.session_num || 1)} session(s)`;
     }
 
     // Peak
@@ -2347,12 +2364,25 @@ async function refresh() {
       document.getElementById('errorSection').classList.remove('show');
     }
 
-    // Session timeline
+    // Session timeline - show only last 5 by default
     if (d.sessions && d.sessions.length > 0) {
       const ts = document.getElementById('timelineSection');
       ts.style.display = 'block';
+      const totalSessions = d.sessions.length;
+      const showAll = window._showAllSessions || false;
+      const visibleStart = showAll ? 0 : Math.max(0, totalSessions - 5);
       let html = '';
+      if (totalSessions > 5 && !showAll) {
+        html += `<div style="text-align:center;margin-bottom:12px;">
+          <button onclick="window._showAllSessions=true;refresh();" style="background:var(--card);border:1px solid var(--card-border);color:var(--text);padding:6px 16px;border-radius:8px;cursor:pointer;font-size:0.75rem;">Show all ${totalSessions} sessions</button>
+        </div>`;
+      } else if (totalSessions > 5 && showAll) {
+        html += `<div style="text-align:center;margin-bottom:12px;">
+          <button onclick="window._showAllSessions=false;refresh();" style="background:var(--card);border:1px solid var(--card-border);color:var(--text);padding:6px 16px;border-radius:8px;cursor:pointer;font-size:0.75rem;">Show last 5 sessions</button>
+        </div>`;
+      }
       d.sessions.forEach((s, idx) => {
+        if (idx < visibleStart) return;
         const isLast = idx === d.sessions.length - 1;
         const dotClass = isLast ? (d.finished ? 'done' : 'active') : 'done';
         const label = isLast && !d.finished ? 'Current Session' : `Session ${s.num}`;
@@ -2462,7 +2492,10 @@ async function refresh() {
     document.title = (pct > 0 && pct < 100) ? '[' + pct + '%] CloudMirror' : 'CloudMirror';
 
     // Smoothed ETA based on average speed
-    if (d.global_transferred_bytes > 0 && d.global_total_bytes > 0 && d.global_elapsed_sec > 0) {
+    if (pct >= 100) {
+        document.getElementById('bpEta').textContent = 'Complete';
+        document.getElementById('finishTime').textContent = '';
+    } else if (d.global_transferred_bytes > 0 && d.global_total_bytes > 0 && d.global_elapsed_sec > 0) {
         const avgBps = d.global_transferred_bytes / d.global_elapsed_sec;
         const remaining = d.global_total_bytes - d.global_transferred_bytes;
         if (avgBps > 0 && remaining > 0) {
