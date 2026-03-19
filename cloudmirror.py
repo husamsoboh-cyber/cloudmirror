@@ -1353,9 +1353,13 @@ body::before {
 }
 
 .session-badge {
-  font-size: 0.65rem; color: var(--primary); background: rgba(var(--primary-rgb),0.1);
-  border: 1px solid rgba(var(--primary-rgb),0.2); padding: 3px 10px; border-radius: 12px;
   font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: rgba(99,102,241,0.06);
+  border: 1px solid rgba(99,102,241,0.12);
+  color: rgba(99,102,241,0.7);
 }
 
 .header-right {
@@ -1461,6 +1465,12 @@ body::before {
   line-height: 1.2; letter-spacing: -0.02em;
 }
 .stat-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.stat-icon {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 8px;
+}
+.stat-icon svg { width: 14px; height: 14px; }
 /* Stat card color classes: indigo + cyan only */
 .stat-value.green, .stat-value.blue, .stat-value.purple, .stat-value.cyan { color: var(--text) !important; }
 .stat-value.orange, .stat-value.yellow, .stat-value.pink { color: var(--text) !important; }
@@ -1670,22 +1680,50 @@ body::before {
 .footer a:hover { text-decoration: underline; }
 
 /* ========== CONTROL BUTTONS ========== */
+#controlBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
 .ctrl-btn {
-  padding: 7px 14px; border: none; border-radius: 8px; font-size: 13px;
-  font-weight: 500; cursor: pointer; transition: all var(--transition); letter-spacing: 0.03em;
-  text-transform: uppercase; min-height: 34px;
+  padding: 8px 20px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
   font-family: 'DM Sans', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: rgba(255,255,255,0.03);
+  color: var(--text-secondary, #8b8fa3);
+  letter-spacing: 0.02em;
+  min-height: 38px;
 }
-.ctrl-btn:active { transform: scale(0.95); }
-.ctrl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ctrl-btn:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.15);
+  color: var(--text, #ececf1);
+}
+.ctrl-btn:active { transform: scale(0.97); }
+.ctrl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
 .ctrl-btn.pause {
-  background: rgba(239,68,68,0.1); color: var(--red); border: 1px solid rgba(239,68,68,0.2);
+  background: rgba(239,68,68,0.06);
+  border-color: rgba(239,68,68,0.15);
+  color: #f87171;
 }
-.ctrl-btn.pause:hover:not(:disabled) { background: rgba(239,68,68,0.2); }
+.ctrl-btn.pause:hover { background: rgba(239,68,68,0.12); }
+
 .ctrl-btn.resume {
-  background: rgba(34,197,94,0.1); color: var(--green); border: 1px solid rgba(34,197,94,0.2);
+  background: rgba(52,211,153,0.06);
+  border-color: rgba(52,211,153,0.15);
+  color: #34d399;
 }
-.ctrl-btn.resume:hover:not(:disabled) { background: rgba(34,197,94,0.2); }
+.ctrl-btn.resume:hover { background: rgba(52,211,153,0.12); }
+
 .ctrl-btn .spinner {
   display: inline-block; width: 10px; height: 10px; border: 2px solid currentColor;
   border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite;
@@ -1786,52 +1824,76 @@ body::before {
 </div>
 
 <!-- Floating control bar -->
-<div id="controlBar" style="display:flex;align-items:center;justify-content:center;gap:10px;margin:12px 0 8px 0;flex-wrap:wrap;">
+<div id="controlBar">
   <div class="session-badge" id="sessionBadge">Session 1</div>
   <button class="ctrl-btn pause" id="btnPause" onclick="doAction('pause')">Pause</button>
   <button class="ctrl-btn resume" id="btnResume" onclick="doAction('resume')" style="display:none">Resume</button>
-  <button class="ctrl-btn" id="btnCancel" onclick="cancelTransfer()" style="background:rgba(239,68,68,0.08);color:var(--red);border:1px solid rgba(239,68,68,0.2);font-size:0.65rem;">Cancel</button>
-  <a href="/wizard" class="ctrl-btn" id="btnNewTransfer" style="background:rgba(167,139,250,0.15);color:var(--purple);border:1px solid rgba(167,139,250,0.3);text-decoration:none;padding:6px 18px;font-size:0.75rem;">New Transfer</a>
+  <button class="ctrl-btn" id="btnCancel" onclick="cancelTransfer()">Cancel</button>
+  <a href="/wizard" class="ctrl-btn" id="btnNewTransfer" style="text-decoration:none;">New Transfer</a>
 </div>
 
 <!-- Stats -->
 <div class="stats-grid" id="statsGrid">
   <div class="stat-card">
+    <div class="stat-icon" style="color: var(--primary); background: rgba(99,102,241,0.1);">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1L4 9h4l-1 6 5-8H8l1-6z"/></svg>
+    </div>
     <div class="stat-label">Current Speed</div>
     <div class="stat-value green" id="speed">--</div>
     <div class="stat-sub" id="speedSub">--</div>
   </div>
   <div class="stat-card">
+    <div class="stat-icon" style="color: var(--primary); background: rgba(99,102,241,0.1);">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 12 5 7 8 9 14 3"/><polyline points="10 3 14 3 14 7"/></svg>
+    </div>
     <div class="stat-label">Avg Speed (overall)</div>
     <div class="stat-value blue" id="avgSpeed">--</div>
     <div class="stat-sub" id="avgSpeedSub">across all sessions</div>
   </div>
   <div class="stat-card">
+    <div class="stat-icon" style="color: var(--primary); background: rgba(99,102,241,0.1);">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 14l4-6 3 3 5-9"/></svg>
+    </div>
     <div class="stat-label">Peak Speed</div>
     <div class="stat-value purple" id="peakSpeed">--</div>
     <div class="stat-sub" id="peakTime">--</div>
   </div>
   <div class="stat-card">
+    <div class="stat-icon" style="color: var(--secondary); background: rgba(34,211,238,0.1);">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><polyline points="8 4 8 8 11 10"/></svg>
+    </div>
     <div class="stat-label">Total Active Time</div>
     <div class="stat-value cyan" id="elapsed">--</div>
     <div class="stat-sub" id="elapsedSub">this session: --</div>
   </div>
   <div class="stat-card">
+    <div class="stat-icon" style="color: var(--secondary); background: rgba(34,211,238,0.1);">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="1" width="10" height="13" rx="1"/><line x1="6" y1="4" x2="10" y2="4"/><line x1="6" y1="7" x2="10" y2="7"/><line x1="6" y1="10" x2="8" y2="10"/></svg>
+    </div>
     <div class="stat-label">Files/min</div>
     <div class="stat-value orange" id="filesRate">--</div>
     <div class="stat-sub" id="filesRateSub">--</div>
   </div>
   <div class="stat-card">
+    <div class="stat-icon" style="color: var(--secondary); background: rgba(34,211,238,0.1);">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M6 8l2 2 4-4"/></svg>
+    </div>
     <div class="stat-label">Total Files Copied</div>
     <div class="stat-value yellow" id="totalCopied">--</div>
     <div class="stat-sub" id="totalCopiedSub">all sessions</div>
   </div>
   <div class="stat-card">
+    <div class="stat-icon" style="color: #fb923c; background: rgba(251,146,60,0.1);">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><line x1="6" y1="6" x2="6" y2="10"/><line x1="10" y1="6" x2="10" y2="10"/></svg>
+    </div>
     <div class="stat-label">Total Downtime</div>
     <div class="stat-value pink" id="downtime">--</div>
     <div class="stat-sub" id="downtimeSub">--</div>
   </div>
   <div class="stat-card">
+    <div class="stat-icon" style="color: #f87171; background: rgba(248,113,113,0.1);">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L1 14h14L8 1z"/><line x1="8" y1="6" x2="8" y2="9"/><circle cx="8" cy="11.5" r="0.5" fill="currentColor"/></svg>
+    </div>
     <div class="stat-label">Errors</div>
     <div class="stat-value" id="errors" style="color:var(--green)">0</div>
     <div class="stat-sub" id="errorSub">none</div>
