@@ -89,16 +89,6 @@ def start_dashboard(manager: TransferManager, start_rclone: bool = False) -> Non
 
     port = PORT
 
-    print()
-    print(f"  CloudHop: http://localhost:{port}")
-    print()
-    if manager.transfer_active:
-        print("  Open the link above in your browser to monitor progress.")
-    else:
-        print("  Open the link above in your browser to start the setup wizard.")
-    print("  Press Ctrl+C to stop the server.")
-    print()
-
     server = None
     for try_port in range(port, port + 5):
         try:
@@ -120,6 +110,16 @@ def start_dashboard(manager: TransferManager, start_rclone: bool = False) -> Non
     if server is None:
         print(f"\n  Error: Could not bind to any port in range {port}-{port + 4}.\n")
         sys.exit(1)
+
+    print()
+    print(f"  CloudHop: http://localhost:{port}")
+    print()
+    if manager.transfer_active:
+        print("  Open the link above in your browser to monitor progress.")
+    else:
+        print("  Open the link above in your browser to start the setup wizard.")
+    print("  Press Ctrl+C to stop the server.")
+    print()
 
     # Try to open browser automatically (after port binding succeeds)
     try:
@@ -159,6 +159,14 @@ def parse_cli_args(manager: TransferManager, args: List[str]) -> None:
         else:
             extra_flags.append(arg)
 
+    # Check attach mode first - doesn't need source/dest
+    if attach_pid:
+        if attach_log:
+            manager.log_file = attach_log
+        manager.rclone_pid = attach_pid
+        manager.transfer_active = True
+        return
+
     if not source or not dest:
         print("Usage: cloudhop <source> <destination> [--flags]")
         print("Example: cloudhop onedrive: gdrive:backup --transfers=8")
@@ -168,14 +176,6 @@ def parse_cli_args(manager: TransferManager, args: List[str]) -> None:
         sys.exit(1)
 
     manager.set_transfer_paths(source, dest)
-
-    # Attach to an existing rclone process instead of starting a new one
-    if attach_pid:
-        manager.rclone_pid = attach_pid
-        manager.transfer_active = True
-        if attach_log:
-            manager.log_file = attach_log
-        return
 
     manager.rclone_cmd = [
         "rclone", "copy", source, dest,

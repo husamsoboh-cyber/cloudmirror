@@ -20,7 +20,7 @@ function showConfirmModal(message) {
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;';
-    overlay.innerHTML = `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:28px 32px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.3);"><p style="margin:0 0 20px;font-size:0.95rem;color:var(--text-primary);">${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p><div style="display:flex;gap:10px;justify-content:flex-end;"><button id="_cm_cancel" style="padding:8px 18px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);cursor:pointer;">Cancel</button><button id="_cm_ok" style="padding:8px 18px;border-radius:8px;border:none;background:var(--primary);color:#fff;cursor:pointer;font-weight:600;">OK</button></div></div>`;
+    overlay.innerHTML = `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:28px 32px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.3);"><p style="margin:0 0 20px;font-size:0.95rem;color:var(--text-primary);">${esc(message)}</p><div style="display:flex;gap:10px;justify-content:flex-end;"><button id="_cm_cancel" style="padding:8px 18px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);cursor:pointer;">Cancel</button><button id="_cm_ok" style="padding:8px 18px;border-radius:8px;border:none;background:var(--primary);color:#fff;cursor:pointer;font-weight:600;">OK</button></div></div>`;
     document.body.appendChild(overlay);
     function cleanup() { overlay.remove(); document.removeEventListener('keydown', escHandler); }
     function escHandler(e) { if (e.key === 'Escape') { cleanup(); resolve(false); } }
@@ -247,14 +247,19 @@ function updateStatusDot(state) {
   }
 }
 
+function $(id) { return document.getElementById(id); }
+function setText(id, val) { const el = $(id); if (el) el.textContent = val; }
+function setHTML(id, val) { const el = $(id); if (el) el.innerHTML = val; }
+function setDisplay(id, val) { const el = $(id); if (el) el.style.display = val; }
+function setWidth(id, val) { const el = $(id); if (el) el.style.width = val; }
+
 async function refresh() {
   try {
     const res = await fetch('/api/status');
     if (!res.ok) return;
     const d = await res.json();
     failCount = 0;
-    const connLost = document.getElementById('connLost');
-    if (connLost) connLost.style.display = 'none';
+    setDisplay('connLost', 'none');
     const header = document.querySelector('.header');
     if (header) header.style.top = '0';
     document.body.style.paddingTop = '';
@@ -272,7 +277,7 @@ async function refresh() {
       });
       { const cb = document.getElementById('controlBar'); if (cb) cb.style.display = 'none'; }
       updateStatusDot('idle');
-      document.getElementById('statusText').textContent = 'Idle';
+      setText('statusText', 'Idle');
       return;
     }
     // If rclone is running but log not ready yet, show Starting state
@@ -288,7 +293,7 @@ async function refresh() {
       });
       { const cb = document.getElementById('controlBar'); if (cb) cb.style.display = 'flex'; }
       updateStatusDot('active');
-      document.getElementById('statusText').textContent = 'Starting...';
+      setText('statusText', 'Starting...');
       return;
     }
 
@@ -359,6 +364,8 @@ async function refresh() {
 
     // Big progress - GLOBAL
     const pct = d.global_pct || 0;
+    // Reset peak speed when a new transfer starts
+    if (d.session_num === 1 && pct < 5) { peakSpeedVal = 0; peakSpeedTime = ''; }
     document.getElementById('bigPct').textContent = pct;
     document.getElementById('bigBar').style.width = Math.max(pct, 0.2) + '%';
     document.getElementById('bigBar').setAttribute('aria-valuenow', pct);
@@ -649,7 +656,7 @@ async function refresh() {
   } catch(e) {
     console.error('Refresh error:', e);
     failCount++;
-    if (failCount >= 3) { document.getElementById('connLost').style.display = 'block'; document.body.style.paddingTop = '48px'; document.querySelector('.header').style.top = '48px'; }
+    if (failCount >= 3) { setDisplay('connLost', 'block'); document.body.style.paddingTop = '48px'; const hdr = document.querySelector('.header'); if (hdr) hdr.style.top = '48px'; }
   }
 }
 

@@ -13,7 +13,9 @@
 
 **Mac** - Download `CloudHop.dmg` from [Releases](https://github.com/husamsoboh-cyber/cloudhop/releases)
 
-**Windows** - Download `CloudHop-Setup.exe` from [Releases](https://github.com/husamsoboh-cyber/cloudhop/releases)
+First launch: right-click > Open > click "Open" ([why?](https://support.apple.com/en-us/102445))
+
+**Windows** - Download `CloudHop-windows.zip` from [Releases](https://github.com/husamsoboh-cyber/cloudhop/releases)
 
 **pip**
 ```bash
@@ -65,7 +67,7 @@ Google Drive, OneDrive, Dropbox, iCloud Drive, MEGA, Amazon S3, Proton Drive, Lo
 
 ## Links
 
-[Security](SECURITY.md) | [Contributing](CONTRIBUTING.md) | [Changelog](CHANGELOG.md)
+[Security](SECURITY.md) | [Privacy](PRIVACY.md) | [Contributing](CONTRIBUTING.md) | [Changelog](CHANGELOG.md)
 
 ## Built by
 

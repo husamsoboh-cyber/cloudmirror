@@ -16,7 +16,7 @@ let selectedSpeed = '8';
 let existingRemotes = [];
 
 const providerKeys = {
-  drive: 'gdrive', onedrive: 'onedrive', dropbox: 'dropbox', mega: 'mega', s3: 's3', protondrive: 'protondrive', local: 'local', icloud: 'iclouddrive', other: null
+  drive: 'gdrive', onedrive: 'onedrive', dropbox: 'dropbox', mega: 'mega', s3: 's3', protondrive: 'protondrive', local: 'local', icloud: 'local', other: null
 };
 const providerIcons = {
   drive: '<div style="font-size:1.5rem;font-weight:800;line-height:1;"><span style="color:#4285f4">G</span><span style="color:#ea4335">o</span><span style="color:#fbbc05">o</span><span style="color:#4285f4">g</span><span style="color:#34a853">l</span><span style="color:#ea4335">e</span></div>',
@@ -81,7 +81,7 @@ function showConfirmModal(message) {
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:400;display:flex;align-items:center;justify-content:center;';
     const box = document.createElement('div');
     box.style.cssText = 'background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:28px 24px;max-width:440px;width:90%;text-align:center;';
-    box.innerHTML = '<div style="font-size:0.95rem;color:var(--text);margin-bottom:20px;line-height:1.6;">' + message.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>'
+    box.innerHTML = '<div style="font-size:0.95rem;color:var(--text);margin-bottom:20px;line-height:1.6;">' + esc(message) + '</div>'
       + '<div style="display:flex;gap:12px;justify-content:center;">'
       + '<button id="cmConfirmCancel" class="btn btn-secondary" style="padding:10px 24px;border-radius:10px;font-size:0.85rem;cursor:pointer;">Cancel</button>'
       + '<button id="cmConfirmOk" class="btn btn-primary" style="padding:10px 24px;border-radius:10px;font-size:0.85rem;cursor:pointer;">Continue</button>'
@@ -173,8 +173,13 @@ function selectSource(card) {
   sourceDisplayName = card.dataset.name;
   sourceName = providerKeys[sourceProvider] || sourceProvider;
 
-  document.getElementById('sourceLocalPath').classList.toggle('show', sourceProvider === 'local');
+  document.getElementById('sourceLocalPath').classList.toggle('show', sourceProvider === 'local' || sourceProvider === 'icloud');
   document.getElementById('sourceOtherName').classList.toggle('show', sourceProvider === 'other');
+  if (sourceProvider === 'icloud') {
+    // Auto-fill with macOS iCloud Drive path
+    const pathInput = document.getElementById('sourcePathInput');
+    if (pathInput) pathInput.value = (window._homeDir || '') + '/Library/Mobile Documents/com~apple~CloudDocs';
+  }
   // For Other provider, only enable Next when name is entered
   if (sourceProvider === 'other') {
     const input = document.getElementById('sourceOtherInput');
@@ -212,8 +217,13 @@ function selectDest(card) {
     destName = sourceName + '_dest';
   }
 
-  document.getElementById('destLocalPath').classList.toggle('show', destProvider === 'local');
+  document.getElementById('destLocalPath').classList.toggle('show', destProvider === 'local' || destProvider === 'icloud');
   document.getElementById('destOtherName').classList.toggle('show', destProvider === 'other');
+  if (destProvider === 'icloud') {
+    // Auto-fill with macOS iCloud Drive path
+    const pathInput = document.getElementById('destPathInput');
+    if (pathInput) pathInput.value = (window._homeDir || '') + '/Library/Mobile Documents/com~apple~CloudDocs';
+  }
   // For Other provider, only enable Next when name is entered
   if (destProvider === 'other') {
     const input = document.getElementById('destOtherInput');

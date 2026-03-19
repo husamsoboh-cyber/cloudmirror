@@ -175,6 +175,7 @@ class TransferManager:
         # Locks
         self.state_lock: threading.RLock = threading.RLock()
         self.transfer_lock: threading.Lock = threading.Lock()
+        self._scan_lock: threading.Lock = threading.Lock()
 
         # Persistent state
         self.state: Dict[str, Any] = self._load_state()
@@ -234,40 +235,42 @@ class TransferManager:
 
     def save_state(self) -> None:
         """Save persistent state to disk."""
-        try:
-            tmp = self.state_file + ".tmp"
-            with open(tmp, "w") as f:
-                json.dump(self.state, f, indent=2)
-            os.replace(tmp, self.state_file)
-        except Exception as e:
-            print(f"Warning: Could not save state: {e}")
+        with self.state_lock:
+            try:
+                tmp = self.state_file + ".tmp"
+                with open(tmp, "w") as f:
+                    json.dump(self.state, f)
+                os.replace(tmp, self.state_file)
+            except Exception:
+                pass
 
     # ---- rclone process management -------------------------------------------
 
     def is_rclone_running(self) -> bool:
         """Return True if the tracked rclone process is still alive."""
-        pid = self.rclone_pid  # snapshot to avoid race
-        if not pid:
-            return False
-        try:
-            waited_pid, status = os.waitpid(pid, os.WNOHANG)
-            if waited_pid == 0:
-                return True  # still running
-            self.rclone_pid = None  # reaped zombie
-            self.transfer_active = False
-            return False
-        except ChildProcessError:
-            # Not our child - fall back to kill check
+        with self.state_lock:
+            pid = self.rclone_pid  # snapshot to avoid race
+            if not pid:
+                return False
             try:
-                os.kill(pid, 0)
-                return True
+                waited_pid, status = os.waitpid(pid, os.WNOHANG)
+                if waited_pid == 0:
+                    return True  # still running
+                self.rclone_pid = None  # reaped zombie
+                self.transfer_active = False
+                return False
+            except ChildProcessError:
+                # Not our child - fall back to kill check
+                try:
+                    os.kill(pid, 0)
+                    return True
+                except (ProcessLookupError, OSError):
+                    self.rclone_pid = None
+                    self.transfer_active = False
             except (ProcessLookupError, OSError):
                 self.rclone_pid = None
                 self.transfer_active = False
-        except (ProcessLookupError, OSError):
-            self.rclone_pid = None
-            self.transfer_active = False
-        return False
+            return False
 
     # ---- full log scanner (session detection + chart history) ----------------
 
@@ -281,6 +284,10 @@ class TransferManager:
         snapshotted *before* the drop so we don't lose progress from
         earlier runs.
         """
+        with self._scan_lock:
+            self._scan_full_log_locked()
+
+    def _scan_full_log_locked(self) -> None:
         if not os.path.exists(self.log_file):
             return
 
@@ -1222,6 +1229,7 @@ class TransferManager:
                 start_new_session=True,
             )
             self.rclone_pid = proc.pid
+            self.transfer_active = True
             return {"ok": True, "msg": f"Started rclone (PID {proc.pid})"}
         except Exception as e:
             return {"ok": False, "msg": f"Failed to start: {str(e)}"}

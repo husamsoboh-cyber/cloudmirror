@@ -39,7 +39,7 @@ RE_TRANSFERRED_FILES = re.compile(
 RE_ELAPSED = re.compile(r"Elapsed time:\s*(.+)")
 RE_ERRORS = re.compile(r"Errors:\s+(\d+)")
 RE_SPEED = re.compile(r"([\d.]+)\s*([KMGT]i?B)/s", re.I)
-RE_COPIED = re.compile(r"INFO\s+:\s+(.+?):\s+Copied\s+\(new\)")
+RE_COPIED = re.compile(r"INFO\s+:\s+(.+?):\s+Copied\s+\(")
 RE_ACTIVE = re.compile(
     r"\*\s+(.+?):\s+(\d+)%\s*/(\S+),\s*(\S+/s),\s*(\S+)"
 )
@@ -54,7 +54,7 @@ RE_CHECKS_LISTED = re.compile(
     r"Checks:\s+(\d+)\s*/\s*(\d+).+Listed\s+(\d+)"
 )
 RE_COPIED_WITH_TS = re.compile(
-    r"(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+INFO\s+:\s+(.+?):\s+Copied\s+\(new\)"
+    r"(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+INFO\s+:\s+(.+?):\s+Copied\s+\("
 )
 RE_ERROR_MSG = re.compile(r"\d{2}:\d{2}:\d{2}\s+ERROR\s+:\s+(.+)")
 RE_TIMESTAMP = re.compile(

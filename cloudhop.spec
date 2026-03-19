@@ -14,14 +14,9 @@ and subprocess calls to "rclone" find the bundled binary automatically.
 
 import os, glob
 
-# Resolve the rclone binary (the extracted folder from the zip)
-rclone_matches = glob.glob('/tmp/rclone-*-osx-amd64/rclone')
-if not rclone_matches:
-    raise FileNotFoundError(
-        "rclone binary not found at /tmp/rclone-*-osx-amd64/rclone. "
-        "Run: cd /tmp && curl -LO https://downloads.rclone.org/rclone-current-osx-amd64.zip && unzip -o rclone-current-osx-amd64.zip"
-    )
-RCLONE_BIN = rclone_matches[0]
+# Resolve the rclone binary - search any architecture, then fall back to PATH
+rclone_bins = glob.glob('/tmp/rclone-*/rclone') + glob.glob('/tmp/rclone-*/rclone.exe') + ['rclone']
+RCLONE_BIN = next((r for r in rclone_bins if os.path.exists(r)), 'rclone')
 
 a = Analysis(
     ['cloudhop_main.py'],

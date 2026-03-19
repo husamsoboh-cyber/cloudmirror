@@ -1,6 +1,47 @@
 # Changelog
 
-All notable changes to CloudMirror are documented here.
+All notable changes to CloudHop are documented here.
+
+## v0.6.1 (2026-03-19)
+
+### Fixed
+- Mac DMG build: retry on "Resource busy" error during hdiutil attach
+- CI: bundle ARM64 rclone binary for Apple Silicon builds
+
+## v0.6.0 (2026-03-19)
+
+### Changed
+- Rebranded from CloudMirror to CloudHop
+- Open source release preparation
+- Added SECURITY.md, PRIVACY.md, CONTRIBUTING.md
+- Added GitHub Actions CI workflow for Mac .dmg and Windows installers
+- Added dashboard screenshot to README
+- PyInstaller build config for Mac .dmg
+
+### Fixed
+- Various bug fixes from rebrand and release prep
+
+## v0.5.2 (2026-03-19)
+
+### Fixed
+- Chart rendering: axis labels, segment artifacts, files count display
+
+## v0.5.1 (2026-03-19)
+
+### Fixed
+- Dashboard bug fixes and UI polish
+- Added `--attach-pid` mode
+
+## v0.5.0 (2026-03-19)
+
+### Changed
+- Architecture refactor: modular package structure
+- Complete type hints added throughout
+- 219 tests, all 5/5 PRD criteria verified
+
+### Fixed
+- 3 critical bugs from modular refactor
+- TransferManager test coverage added (192 tests total)
 
 ## v0.4.0 (2026-03-19)
 
@@ -62,7 +103,7 @@ All notable changes to CloudMirror are documented here.
 ## v0.3.0 (2026-03-19)
 
 ### Added
-- Progress percentage in browser tab title (`[45%] CloudMirror`)
+- Progress percentage in browser tab title (`[45%] CloudHop`)
 - Bandwidth limit option in wizard (e.g. 10M, 1G, 500K)
 - Dry-run / Preview button on summary step (shows file count and size before starting)
 - Transfer history API (`/api/history`) with link in dashboard footer
