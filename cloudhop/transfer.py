@@ -79,6 +79,7 @@ from .utils import (
     ERROR_TAIL_BYTES,
     CHART_DOWNSAMPLE_TARGET,
     SCANNER_INTERVAL_SEC,
+    SCHEDULER_CHECK_INTERVAL_SEC,
     MIN_SESSION_ELAPSED_SEC,
     MAX_REQUEST_BODY_BYTES,
     MIN_DOWNTIME_GAP_SEC,
@@ -217,6 +218,7 @@ class TransferManager:
 
         # Internal flag used by scan_full_log to avoid concurrent size fetches
         self._size_fetching: bool = False
+        self._notified_complete: bool = False
 
     # ---- path helpers --------------------------------------------------------
 
@@ -231,6 +233,65 @@ class TransferManager:
         dst_label = get_remote_label(dest)
         self.transfer_label = f"{src_label} -> {dst_label}"
         self.state = self._load_state()
+
+    # ---- schedule window checker --------------------------------------------
+
+    def is_in_schedule_window(self) -> bool:
+        """Check if current time falls within the scheduled transfer window."""
+        with self.state_lock:
+            schedule = self.state.get("schedule", {})
+
+        if not schedule.get("enabled", False):
+            return True  # No schedule = always allowed
+
+        now = datetime.now()
+        current_day = now.weekday()  # 0=Monday
+        allowed_days = schedule.get("days", [0, 1, 2, 3, 4, 5, 6])
+
+        if current_day not in allowed_days:
+            return False
+
+        current_minutes = now.hour * 60 + now.minute
+        start_h, start_m = map(int, schedule.get("start_time", "22:00").split(":"))
+        end_h, end_m = map(int, schedule.get("end_time", "06:00").split(":"))
+        start_minutes = start_h * 60 + start_m
+        end_minutes = end_h * 60 + end_m
+
+        if start_minutes <= end_minutes:
+            # Same-day window (e.g., 09:00 - 17:00)
+            return start_minutes <= current_minutes < end_minutes
+        else:
+            # Overnight window (e.g., 22:00 - 06:00)
+            return current_minutes >= start_minutes or current_minutes < end_minutes
+
+    def _check_schedule(self) -> None:
+        """Auto-pause/resume based on schedule window. Called by background_scanner."""
+        with self.state_lock:
+            schedule = self.state.get("schedule", {})
+        if not schedule.get("enabled", False):
+            return
+
+        in_window = self.is_in_schedule_window()
+
+        if in_window and not self.is_rclone_running() and self.rclone_cmd:
+            # Window opened - resume transfer
+            result = self.resume()
+            if result.get("ok"):
+                try:
+                    from .notify import notify
+                    notify("CloudHop", "Transfer resumed (schedule window opened)")
+                except Exception:
+                    pass
+
+        elif not in_window and self.is_rclone_running():
+            # Window closed - pause transfer
+            result = self.pause()
+            if result.get("ok"):
+                try:
+                    from .notify import notify
+                    notify("CloudHop", "Transfer paused (outside schedule window)")
+                except Exception:
+                    pass
 
     # ---- state persistence ---------------------------------------------------
 
@@ -248,6 +309,14 @@ class TransferManager:
             "all_file_types": {},
             "total_copied_count": 0,
             "speed_samples": [],
+            "schedule": {
+                "enabled": False,
+                "start_time": "22:00",
+                "end_time": "06:00",
+                "days": [0, 1, 2, 3, 4, 5, 6],
+                "bw_limit_in_window": "",
+                "bw_limit_out_window": "0",
+            },
         }
 
     def _load_state(self) -> Dict[str, Any]:
@@ -1291,12 +1360,18 @@ class TransferManager:
         if self.is_rclone_running():
             return {"ok": False, "msg": "rclone is already running"}
         try:
-            proc = subprocess.Popen(
-                self.rclone_cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
+            popen_kwargs = {
+                "stdout": subprocess.DEVNULL,
+                "stderr": subprocess.DEVNULL,
+            }
+            if platform.system().lower() == "windows":
+                popen_kwargs["creationflags"] = (
+                    subprocess.CREATE_NEW_PROCESS_GROUP
+                    | subprocess.DETACHED_PROCESS
+                )
+            else:
+                popen_kwargs["start_new_session"] = True
+            proc = subprocess.Popen(self.rclone_cmd, **popen_kwargs)
             self.rclone_pid = proc.pid
             self.transfer_active = True
             return {"ok": True, "msg": f"Started rclone (PID {proc.pid})"}
@@ -1413,12 +1488,18 @@ class TransferManager:
             self.save_state()
 
         try:
-            proc = subprocess.Popen(
-                self.rclone_cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
+            popen_kwargs = {
+                "stdout": subprocess.DEVNULL,
+                "stderr": subprocess.DEVNULL,
+            }
+            if platform.system().lower() == "windows":
+                popen_kwargs["creationflags"] = (
+                    subprocess.CREATE_NEW_PROCESS_GROUP
+                    | subprocess.DETACHED_PROCESS
+                )
+            else:
+                popen_kwargs["start_new_session"] = True
+            proc = subprocess.Popen(self.rclone_cmd, **popen_kwargs)
             self.rclone_pid = proc.pid
             self.transfer_active = True
             return {"ok": True, "pid": proc.pid}
@@ -1580,6 +1661,7 @@ class TransferManager:
         while True:
             try:
                 self.scan_full_log()
+                self._check_schedule()
             except Exception as e:
                 print(f"Scanner error: {e}")
             time.sleep(SCANNER_INTERVAL_SEC)
