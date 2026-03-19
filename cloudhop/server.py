@@ -180,6 +180,14 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                 "remotes": get_existing_remotes(),
                 "home_dir": os.path.expanduser("~"),
             })
+        elif self.path == "/api/schedule":
+            with self.manager.state_lock:
+                schedule = dict(self.manager.state.get("schedule", {}))
+            if hasattr(self.manager, 'is_in_schedule_window'):
+                schedule["in_window"] = self.manager.is_in_schedule_window()
+            else:
+                schedule["in_window"] = True
+            self._send_json(schedule)
         elif self.path == "/api/history":
             history = []
             for f in sorted(os.listdir(_CM_DIR)):
@@ -291,6 +299,35 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                     self._send_json({"ok": False, "msg": str(e)})
             else:
                 self._send_json({"ok": False, "msg": "Invalid request"}, 400)
+        elif self.path == "/api/schedule":
+            body = self._read_body()
+            if body is None:
+                self._send_json({"ok": False, "msg": "Invalid request"}, 400)
+                return
+            import re
+            start_time = body.get("start_time", "22:00")
+            end_time = body.get("end_time", "06:00")
+            time_re = re.compile(r"^\d{2}:\d{2}$")
+            if not time_re.match(start_time) or not time_re.match(end_time):
+                self._send_json({"ok": False, "msg": "Invalid time format (use HH:MM)"}, 400)
+                return
+            days = body.get("days", [0, 1, 2, 3, 4, 5, 6])
+            if not isinstance(days, list) or not all(isinstance(d, int) and 0 <= d <= 6 for d in days):
+                self._send_json({"ok": False, "msg": "Invalid days"}, 400)
+                return
+            bw_in = body.get("bw_limit_in_window", "")
+            bw_out = body.get("bw_limit_out_window", "0")
+            with self.manager.state_lock:
+                self.manager.state["schedule"] = {
+                    "enabled": bool(body.get("enabled", False)),
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "days": days,
+                    "bw_limit_in_window": bw_in,
+                    "bw_limit_out_window": bw_out,
+                }
+                self.manager.save_state()
+            self._send_json({"ok": True})
         elif self.path == "/api/wizard/start":
             body = self._read_body()
             if body is None:
@@ -320,3 +357,10 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:
         """Suppress default HTTP access logging."""
         pass
+
+    def handle_one_request(self) -> None:
+        """Override to catch BrokenPipeError from disconnected clients."""
+        try:
+            super().handle_one_request()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass

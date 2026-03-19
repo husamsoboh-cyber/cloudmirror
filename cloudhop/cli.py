@@ -47,6 +47,10 @@ def main() -> None:
 
     signal.signal(signal.SIGTERM, lambda signum, frame: _signal_handler(manager))
 
+    # Ignore SIGHUP so CloudHop survives terminal close (Unix only)
+    if hasattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
+
     if len(args) == 0:
         # Web wizard mode
         print()
@@ -158,6 +162,11 @@ def start_dashboard(manager: TransferManager, start_rclone: bool = False) -> Non
         server.serve_forever()
     except KeyboardInterrupt:
         _signal_handler(manager)
+    except Exception as e:
+        print(f"\n  CloudHop server crashed: {e}")
+        print("  The file transfer continues in the background.")
+        print("  Run 'cloudhop' again to reconnect to the dashboard.")
+        print()
 
 
 def parse_cli_args(manager: TransferManager, args: List[str]) -> None:
