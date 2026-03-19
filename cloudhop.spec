@@ -49,7 +49,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,            # keep True so startup messages are visible
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -66,4 +66,20 @@ coll = COLLECT(
     upx=True,
     upx_exclude=[],
     name='CloudHop',
+)
+
+app = BUNDLE(
+    coll,
+    name='CloudHop.app',
+    icon='CloudHop.icns',
+    bundle_identifier='io.github.husamsoboh-cyber.cloudhop',
+    info_plist={
+        'CFBundleName': 'CloudHop',
+        'CFBundleDisplayName': 'CloudHop',
+        'CFBundleVersion': '0.6.0',
+        'CFBundleShortVersionString': '0.6.0',
+        'CFBundleInfoDictionaryVersion': '6.0',
+        'NSHighResolutionCapable': True,
+        'LSMinimumSystemVersion': '10.15',
+    },
 )

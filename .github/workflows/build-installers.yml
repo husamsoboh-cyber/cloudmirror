@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -77,13 +80,15 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
-          pyinstaller --name CloudHop --onedir --noconsole --add-data "cloudhop/templates:cloudhop/templates" --add-data "cloudhop/static:cloudhop/static" --add-data "rclone:." --runtime-hook rthook_cloudhop.py cloudhop_main.py
+          pyinstaller cloudhop.spec --noconfirm
 
       - name: Create DMG
         run: |
-          # hdiutil can fail with "Resource busy" on CI - retry with delay
+          mkdir -p dmg-staging
+          cp -R dist/CloudHop.app dmg-staging/
+          ln -s /Applications dmg-staging/Applications
           for i in 1 2 3; do
-            hdiutil create -volname "CloudHop" -srcfolder dist/CloudHop -ov -format UDZO CloudHop-mac.dmg && break
+            hdiutil create -volname "CloudHop" -srcfolder dmg-staging -ov -format UDZO CloudHop-mac.dmg && break
             echo "Attempt $i failed, waiting..."
             sleep 5
           done
