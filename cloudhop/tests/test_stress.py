@@ -6,14 +6,10 @@ crash.  Every test has a 5-second timeout enforced via threading.Timer.
 """
 
 import json
-import os
-import signal
 import threading
 import time
 from typing import List
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from cloudhop.transfer import TransferManager
 
@@ -383,9 +379,7 @@ class TestMixedConcurrentWorkload:
                     t.join(TIMEOUT_SEC)
                 alive = [t for t in threads if t.is_alive()]
                 if alive:
-                    raise TimeoutError(
-                        f"{len(alive)} threads alive after stop (deadlock?)"
-                    )
+                    raise TimeoutError(f"{len(alive)} threads alive after stop (deadlock?)")
                 if errors:
                     raise AssertionError(f"Errors: {errors}")
 
@@ -409,9 +403,7 @@ class TestLogEdgeCases:
                 i = 0
                 while not stop.is_set():
                     with open(mgr.log_file, "a") as f:
-                        f.write(
-                            f"2025/06/10 12:{i:02d}:00 INFO  : extra_{i}.txt: Copied (new)\n"
-                        )
+                        f.write(f"2025/06/10 12:{i:02d}:00 INFO  : extra_{i}.txt: Copied (new)\n")
                     i = (i + 1) % 60
                     time.sleep(0.01)
             except Exception as e:
