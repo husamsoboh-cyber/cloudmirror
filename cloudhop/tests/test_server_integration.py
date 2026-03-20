@@ -85,16 +85,19 @@ def _fetch(req: urllib.request.Request, timeout: int = 5) -> Dict[str, Any]:
     including ones raised from resp.read() after the status line was already
     received.
     """
-    for attempt in range(3):
+    for attempt in range(_MAX_RETRIES):
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 return json.loads(resp.read())
-        except (ConnectionResetError, ConnectionAbortedError):
-            if attempt < 2:
-                time.sleep(0.3)
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(0.5)
                 req = _rebuild_request(req)
             else:
                 raise
+
+
+_MAX_RETRIES = 5  # macOS CI runners are especially prone to connection resets
 
 
 def _fetch_raw(req: urllib.request.Request, timeout: int = 5):
@@ -103,22 +106,22 @@ def _fetch_raw(req: urllib.request.Request, timeout: int = 5):
     Retries on ConnectionResetError (Python's ThreadingHTTPServer can
     occasionally reset connections under high concurrency).
     """
-    for attempt in range(3):
+    for attempt in range(_MAX_RETRIES):
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 return resp.status, resp.read()
         except urllib.error.HTTPError as e:
             try:
                 return e.code, e.read()
-            except (ConnectionResetError, ConnectionAbortedError):
-                if attempt < 2:
-                    time.sleep(0.3)
+            except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+                if attempt < _MAX_RETRIES - 1:
+                    time.sleep(0.5)
                     req = _rebuild_request(req)
                 else:
                     raise
-        except (ConnectionResetError, ConnectionAbortedError):
-            if attempt < 2:
-                time.sleep(0.3)
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(0.5)
                 req = _rebuild_request(req)
             else:
                 raise
