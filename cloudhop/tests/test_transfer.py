@@ -285,9 +285,10 @@ class TestTransferControl:
         assert manager.rclone_pid is None
 
     @pytest.mark.skipif(_POSIX, reason="Windows pause uses taskkill")
+    @patch("cloudhop.transfer.platform.system", return_value="Windows")
     @patch("subprocess.run")
     @patch("time.sleep")
-    def test_pause_kills_process_windows(self, mock_sleep, mock_run, manager):
+    def test_pause_kills_process_windows(self, mock_sleep, mock_run, mock_sys, manager):
         """pause() uses taskkill on Windows."""
         mock_run.return_value = MagicMock(returncode=0)
         manager.rclone_pid = 5555
@@ -318,8 +319,9 @@ class TestTransferControl:
         assert result["ok"] is False
         assert "not found" in result["msg"]
 
+    @patch("cloudhop.transfer.platform.system", return_value="Linux")
     @patch("subprocess.Popen")
-    def test_resume_starts_process(self, mock_popen, manager):
+    def test_resume_starts_process(self, mock_popen, mock_sys, manager):
         """resume() starts a new rclone process using the saved command."""
         mock_proc = MagicMock()
         mock_proc.pid = 9999
@@ -1000,7 +1002,8 @@ class TestEdgeCases:
         m.scan_full_log()
         assert m.state["all_file_types"].get("other", 0) >= 1
 
-    def test_resume_loads_cmd_from_state(self, manager):
+    @patch("cloudhop.transfer.platform.system", return_value="Linux")
+    def test_resume_loads_cmd_from_state(self, mock_sys, manager):
         """resume() loads rclone_cmd from state if not in memory."""
         manager.rclone_cmd = []
         manager.state["rclone_cmd"] = ["rclone", "copy", "a:", "b:"]
@@ -1115,15 +1118,15 @@ class TestBatteryCheck:
 
 
 class TestCrashBackoff:
+    @patch("cloudhop.transfer.platform.system", return_value="Linux")
     @patch("subprocess.Popen")
-    def test_backoff_after_3_crashes(self, mock_popen, manager):
+    def test_backoff_after_3_crashes(self, mock_popen, mock_sys, manager):
         """resume returns error after 3 rapid failures."""
         mock_proc = MagicMock()
         mock_proc.pid = 1111
         mock_popen.return_value = mock_proc
         manager.rclone_cmd = ["rclone", "copy", "a:", "b:"]
 
-        # First 3 resumes should succeed
         import time
 
         manager._crash_times = [time.time() - 10, time.time() - 5, time.time() - 1]
@@ -1131,8 +1134,9 @@ class TestCrashBackoff:
         assert result["ok"] is False
         assert "keeps failing" in result["msg"]
 
+    @patch("cloudhop.transfer.platform.system", return_value="Linux")
     @patch("subprocess.Popen")
-    def test_backoff_resets_after_5min(self, mock_popen, manager):
+    def test_backoff_resets_after_5min(self, mock_popen, mock_sys, manager):
         """resume works again after 5 minutes of backoff."""
         mock_proc = MagicMock()
         mock_proc.pid = 2222
