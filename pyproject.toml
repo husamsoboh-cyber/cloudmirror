@@ -11,10 +11,7 @@ license = {text = "MIT"}
 requires-python = ">=3.9"
 authors = [{name = "Husam Soboh"}]
 keywords = ["cloud", "file-transfer", "rclone", "google-drive", "onedrive", "dropbox", "icloud"]
-dependencies = []
-
-[project.optional-dependencies]
-app = ["pywebview>=5.0"]
+dependencies = ["pywebview>=5.0"]
 
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -31,7 +28,6 @@ cloudhop = ["templates/*.html", "static/*"]
 
 [project.scripts]
 cloudhop = "cloudhop.cli:main"
-cloudhop-app = "cloudhop.cli:main_app"
 
 [project.urls]
 Homepage = "https://github.com/husamsoboh-cyber/cloudhop"
