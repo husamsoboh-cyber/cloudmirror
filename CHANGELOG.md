@@ -2,6 +2,59 @@
 
 All notable changes to CloudHop are documented here.
 
+## v0.9.11 (2026-03-20)
+
+### Fixed
+
+#### Thread safety
+- **Zombie processes**: store `subprocess.Popen` object (not just PID) and use `proc.poll()` for cross-platform process liveness checks; eliminates zombie rclone processes on all platforms
+- **Race condition on process state**: `rclone_pid`, `_rclone_proc`, and `transfer_active` are now always written under `state_lock` in `_resume_locked`, `_start_transfer_locked`, and CLI startup
+- **Queue TOCTOU race**: `queue_process_next` no longer marks an item "running" before `start_transfer` confirms success; transient "already running" errors leave the item as "queued" for automatic retry instead of permanently marking it "failed"
+- **Deadlock in queue_process_next**: fixed lock ordering violation where `state_lock` was held while calling `start_transfer` which acquires `transfer_lock`
+- **load_state() and set_transfer_paths() without state_lock**: both methods now properly protect shared state mutations
+- **Race condition in /api/history/resume**: state file, log file, command, and label are now swapped atomically under `state_lock`
+
+#### Security
+- **SSRF via rclone backend specifiers**: `validate_rclone_input()` now rejects values starting with `:` followed by a letter (e.g. `:http,url=http://evil.com:`), preventing Server-Side Request Forgery through rclone's on-the-fly backend syntax
+- **Path traversal startswith() without os.sep**: static file serving and history resume now check `realpath.startswith(base + os.sep)` to prevent prefix-matching bypasses
+- **Credential filter stripped legitimate paths**: the filter now only matches known `--flag=value` patterns (e.g. `--mega-pass=`), no longer stripping positional args that happen to contain "user" or "pass" in a path
+
+#### Cross-platform (Windows)
+- **is_rclone_running() crash on Windows**: `os.WNOHANG` does not exist on Windows; added `hasattr(os, "WNOHANG")` guard to skip `os.waitpid` and fall back to `os.kill(pid, 0)`
+- **Popen interference on Windows 3.9/3.11**: `platform.system()` calls in `_resume_locked` and `_start_transfer_locked` no longer interfere with Popen kwargs assembly
+- **start_new_session doesn't detach on Windows**: `cli.py` now uses `CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS` creation flags on Windows instead of `start_new_session`
+- **Hardcoded errno 48**: replaced with `errno.EADDRINUSE` for portable port-busy detection
+
+#### Data integrity
+- **Log truncation breaks incremental scanner**: scanner now detects when the log file is shorter than `last_scan_offset` and resets to scan from the beginning
+- **_parse_recent_files/_parse_error_messages crash if log deleted**: both methods now catch `FileNotFoundError` and `PermissionError` instead of crashing
+
+#### Stability
+- **Battery resume overrides schedule pause**: `_check_battery` now checks `is_in_schedule_window()` before resuming, so a battery-paused transfer does not resume outside the schedule window
+- **Background scanner logging**: replaced `print()` with `logger.exception()` so scanner errors appear in the server log file instead of being lost to stdout
+
+### Added
+- **Lock ordering documentation**: explicit rule `transfer_lock -> _scan_lock -> state_lock` documented in the `transfer.py` module docstring
+- **Stress tests** (`test_stress.py`): 10 tests using real threads with 5-second deadlock detection
+  - Concurrent `scan_full_log` + `parse_current` (20 threads)
+  - Rapid pause/resume cycles (5 threads, 10 cycles each)
+  - Concurrent queue add/remove (15 threads)
+  - Concurrent state save/load (20 threads)
+  - `set_transfer_paths` under contention (10 threads)
+  - Mixed workload: scanner + dashboard polls + user pause + queue advance simultaneously
+  - Log truncation and log growth during active scanning
+  - `is_rclone_running` under contention (20 threads)
+- **HTTP integration tests** (`test_server_integration.py`): 41 tests against a real HTTP server on a random port
+  - All GET routes (status, wizard, queue, schedule, history, dashboard HTML, 404)
+  - All POST routes with valid and invalid input
+  - Security: CSRF enforcement, Host header validation, path traversal, SSRF, CORS
+  - Concurrency: 20+ simultaneous requests to `/api/status`
+
+### Changed
+- **CI matrix expanded**: Python 3.10 and 3.13 added (now testing 3.9, 3.10, 3.11, 3.12, 3.13 across Ubuntu, macOS, Windows = 15 jobs)
+- **CI fail-fast disabled**: all 15 matrix combinations now run to completion even if one fails
+- **CI includes stress + integration tests**: same `pytest` invocation runs unit, stress, and integration tests
+
 ## v0.9.7 (2026-03-20)
 
 ### Added
