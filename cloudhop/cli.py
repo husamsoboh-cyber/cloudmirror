@@ -248,9 +248,11 @@ def start_dashboard(manager: TransferManager, start_rclone: bool = False) -> Non
         else:
             popen_kwargs["start_new_session"] = True
         proc = subprocess.Popen(manager.rclone_cmd, **popen_kwargs)
-        manager.rclone_pid = proc.pid
+        with manager.state_lock:
+            manager._rclone_proc = proc
+            manager.rclone_pid = proc.pid
+            manager.transfer_active = True
         print(f"  Transfer started (PID {proc.pid})")
-        manager.transfer_active = True
 
     port = PORT
 

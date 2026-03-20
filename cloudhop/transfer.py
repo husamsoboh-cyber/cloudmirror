@@ -10,7 +10,8 @@ Threading model
 Three locks protect different scopes of mutable state:
 
 - ``state_lock`` (RLock): guards ``self.state`` (the dict written to
-  cloudhop_*_state.json) and ``self.rclone_pid`` / ``self.transfer_active``.
+  cloudhop_*_state.json), ``self.rclone_pid``, ``self._rclone_proc``, and
+  ``self.transfer_active``.
   Re-entrant so that methods that already hold it can call helpers safely.
 
 - ``transfer_lock`` (Lock): serialises pause / resume / start_transfer so only
@@ -19,6 +20,15 @@ Three locks protect different scopes of mutable state:
 - ``_scan_lock`` (Lock): prevents concurrent calls to
   ``_scan_full_log_locked``.  The background scanner and an ad-hoc call from
   ``_pause_locked`` could otherwise both walk the log file simultaneously.
+
+Lock ordering
+-------------
+Locks MUST be acquired in this order to prevent deadlocks::
+
+    transfer_lock -> _scan_lock -> state_lock
+
+Never acquire a lock that precedes a lock you already hold.  ``state_lock``
+is an RLock so re-entrant acquisition within the same thread is safe.
 
 Data flow
 ---------
@@ -197,6 +207,7 @@ class TransferManager:
         self.rclone_cmd: List[str] = []
         self.transfer_active: bool = False
         self.rclone_pid: Optional[int] = None
+        self._rclone_proc: Optional[subprocess.Popen] = None
         self.log_file: str = os.path.join(self.cm_dir, "cloudhop.log")
         self.state_file: str = os.path.join(self.cm_dir, "cloudhop_state.json")
         self.transfer_label: str = "Source -> Destination"
@@ -370,42 +381,53 @@ class TransferManager:
 
     # ---- rclone process management -------------------------------------------
 
+    def _clear_proc(self) -> None:
+        """Clear tracked process state. Caller MUST hold ``state_lock``."""
+        self._rclone_proc = None
+        self.rclone_pid = None
+        self.transfer_active = False
+
     def is_rclone_running(self) -> bool:
         """Return True if the tracked rclone process is still alive.
 
-        On Unix, ``os.waitpid(pid, WNOHANG)`` is used first so zombie
-        processes are reaped immediately.  If the PID is not a direct child
-        (e.g. when ``--attach-pid`` was used), we fall back to
-        ``os.kill(pid, 0)`` which probes existence without sending a signal.
-        On Windows, ``os.WNOHANG`` does not exist, so we skip straight to
-        the ``kill(pid, 0)`` probe.
+        When a ``Popen`` object is available (normal operation),
+        ``proc.poll()`` is used -- this is cross-platform and automatically
+        reaps zombie processes.
+
+        When only a bare PID is tracked (``--attach-pid`` mode), we fall
+        back to POSIX ``os.waitpid`` / ``os.kill(pid, 0)``, or
+        ``os.kill(pid, 0)`` on Windows.
         """
         with self.state_lock:
-            pid = self.rclone_pid  # snapshot to avoid race
+            proc = self._rclone_proc
+            pid = self.rclone_pid
+            if proc is not None:
+                if proc.poll() is None:
+                    return True
+                self._clear_proc()
+                return False
             if not pid:
                 return False
+            # Attach-pid fallback: no Popen object available.
             # POSIX: reap zombies via waitpid before probing
             if hasattr(os, "WNOHANG"):
                 try:
-                    waited_pid, status = os.waitpid(pid, os.WNOHANG)
+                    waited_pid, _status = os.waitpid(pid, os.WNOHANG)
                     if waited_pid == 0:
                         return True  # still running
-                    self.rclone_pid = None  # reaped zombie
-                    self.transfer_active = False
+                    self._clear_proc()
                     return False
                 except ChildProcessError:
                     pass  # not our child, fall through to kill(0)
                 except (ProcessLookupError, OSError):
-                    self.rclone_pid = None
-                    self.transfer_active = False
+                    self._clear_proc()
                     return False
             # Cross-platform fallback: kill(0) probes without sending a signal
             try:
                 os.kill(pid, 0)
                 return True
             except (ProcessLookupError, OSError):
-                self.rclone_pid = None
-                self.transfer_active = False
+                self._clear_proc()
                 return False
 
     # ---- full log scanner (session detection + chart history) ----------------
@@ -1274,11 +1296,14 @@ class TransferManager:
         # built-in deduplication (--copy-dest / size+time checks) means it
         # skips already-transferred files on resume, so no work is lost.
         with self.state_lock:
+            proc = self._rclone_proc
             pid = self.rclone_pid
         if not pid:
             return {"ok": False, "msg": "No tracked rclone process"}
         try:
-            if platform.system().lower() == "windows":
+            if proc is not None:
+                proc.terminate()
+            elif platform.system().lower() == "windows":
                 subprocess.run(
                     ["taskkill", "/F", "/T", "/PID", str(pid)],
                     capture_output=True,
@@ -1286,15 +1311,13 @@ class TransferManager:
             else:
                 os.kill(pid, signal.SIGTERM)
             with self.state_lock:
-                self.rclone_pid = None
-                self.transfer_active = False
+                self._clear_proc()
             time.sleep(1)
             self.scan_full_log()
             return {"ok": True, "msg": f"Stopped rclone (PID {pid})"}
         except (ProcessLookupError, OSError):
             with self.state_lock:
-                self.rclone_pid = None
-                self.transfer_active = False
+                self._clear_proc()
             return {"ok": False, "msg": "rclone process not found"}
 
     def resume(self) -> Dict[str, Any]:
@@ -1343,8 +1366,10 @@ class TransferManager:
             else:
                 popen_kwargs["start_new_session"] = True
             proc = subprocess.Popen(self.rclone_cmd, **popen_kwargs)
-            self.rclone_pid = proc.pid
-            self.transfer_active = True
+            with self.state_lock:
+                self._rclone_proc = proc
+                self.rclone_pid = proc.pid
+                self.transfer_active = True
             return {"ok": True, "msg": f"Started rclone (PID {proc.pid})"}
         except Exception as e:
             return {"ok": False, "msg": f"Failed to start: {str(e)}"}
@@ -1476,7 +1501,13 @@ class TransferManager:
             return {"ok": False, "msg": "Invalid queue position"}
 
     def queue_process_next(self) -> Dict[str, Any]:
-        """Start the next queued transfer if nothing is running."""
+        """Start the next queued transfer if nothing is running.
+
+        The queue status update is done in two phases to avoid both deadlocks
+        (state_lock must be released before acquiring transfer_lock via
+        start_transfer) and TOCTOU races (item stays "queued" until the
+        transfer actually starts).
+        """
         if self.is_rclone_running():
             return {"ok": False, "msg": "A transfer is already running"}
         next_item: Optional[Dict[str, Any]] = None
@@ -1487,10 +1518,11 @@ class TransferManager:
             for item in self.queue:
                 if item.get("status") == "running":
                     item["status"] = "completed"
-            # Find next queued item
+            # Find next queued item but do NOT mark it "running" yet --
+            # wait until start_transfer succeeds to avoid permanently
+            # marking it "failed" if another transfer raced us.
             for item in self.queue:
                 if item.get("status") == "queued":
-                    item["status"] = "running"
                     next_item = item
                     break
             self._save_queue()
@@ -1498,10 +1530,14 @@ class TransferManager:
             return {"ok": False, "msg": "No queued transfers"}
         # Call start_transfer OUTSIDE state_lock to avoid deadlock
         result = self.start_transfer(next_item)
-        if not result.get("ok"):
-            with self.state_lock:
+        with self.state_lock:
+            if result.get("ok"):
+                next_item["status"] = "running"
+            elif "already running" in result.get("msg", ""):
+                pass  # transient race: leave as "queued" for retry
+            else:
                 next_item["status"] = "failed"
-                self._save_queue()
+            self._save_queue()
         return result
 
     # ---- start_transfer ------------------------------------------------------
@@ -1645,8 +1681,10 @@ class TransferManager:
             else:
                 popen_kwargs["start_new_session"] = True
             proc = subprocess.Popen(self.rclone_cmd, **popen_kwargs)
-            self.rclone_pid = proc.pid
-            self.transfer_active = True
+            with self.state_lock:
+                self._rclone_proc = proc
+                self.rclone_pid = proc.pid
+                self.transfer_active = True
             return {"ok": True, "pid": proc.pid}
         except Exception as e:
             return {"ok": False, "msg": str(e)}
@@ -1857,6 +1895,6 @@ class TransferManager:
                 # Auto-process queue when current transfer finishes
                 if not self.is_rclone_running() and self.queue:
                     self.queue_process_next()
-            except Exception as e:
-                print(f"Scanner error: {e}")
+            except Exception:
+                logger.exception("Scanner error")
             time.sleep(SCANNER_INTERVAL_SEC)

@@ -112,17 +112,26 @@ RE_SECONDS = re.compile(r"([\d.]+)s")
 
 
 def validate_rclone_input(value: str, field_name: str) -> bool:
-    """Reject inputs that could be interpreted as rclone flags.
+    """Reject inputs that could be interpreted as rclone flags or SSRF vectors.
 
     Without this, a malicious wizard input like "--config=/etc/passwd" would be
     passed directly to the rclone subprocess, allowing flag injection attacks.
     Newlines/nulls are rejected to prevent argument splitting.
+
+    Backend specifiers like ``:http,url=http://evil.com:`` are also rejected
+    because rclone would fetch from the attacker-controlled URL (SSRF).
     """
     if not value:
         return True
     if value.startswith("--") or value.startswith("-"):
         return False
     if "\n" in value or "\r" in value or "\x00" in value:
+        return False
+    # Reject rclone on-the-fly backend specifiers (SSRF risk).
+    # These look like :backend,key=value:path and allow rclone to connect to
+    # arbitrary URLs without a pre-configured remote.  Legitimate remote paths
+    # always start with a name (e.g. "gdrive:"), never with a bare colon.
+    if re.match(r"^:[a-zA-Z]", value):
         return False
     return True
 
