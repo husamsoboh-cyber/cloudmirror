@@ -35,18 +35,21 @@
 function handleDrop(event, inputId) {
   const items = event.dataTransfer.items || event.dataTransfer.files;
   if (items && items.length > 0) {
-    // Try to get the path from the dropped item
     const item = items[0];
     if (item.kind === 'file') {
       const file = item.getAsFile ? item.getAsFile() : item;
-      // Browsers expose .path for local files in Electron/NW.js, but not in regular browsers.
-      // For regular browsers, we use the file name as a hint.
-      const path = file.path || file.name || '';
-      if (path) {
-        const input = document.getElementById(inputId);
-        if (input) {
-          input.value = path;
-          input.dispatchEvent(new Event('input'));
+      // file.path is only available in Electron/NW.js (.app version), not in regular browsers
+      const path = file.path || '';
+      const input = document.getElementById(inputId);
+      if (path && input) {
+        input.value = path;
+        input.dispatchEvent(new Event('input'));
+      } else if (input) {
+        // Regular browser - can't get full path, show hint with folder name
+        const name = file.name || '';
+        if (name) {
+          input.placeholder = 'Type the full path to "' + name + '"';
+          input.focus();
         }
       }
     }

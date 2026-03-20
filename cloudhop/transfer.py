@@ -1390,15 +1390,21 @@ class TransferManager:
         """Load queue from disk."""
         try:
             with open(self.queue_file, "r") as f:
-                self.queue = json.load(f)
+                data = json.load(f)
+                if isinstance(data, list):
+                    self.queue = data
+                else:
+                    self.queue = []
         except (FileNotFoundError, json.JSONDecodeError):
             self.queue = []
 
     def _save_queue(self) -> None:
         """Save queue to disk."""
         try:
-            with open(self.queue_file, "w") as f:
+            tmp = self.queue_file + ".tmp"
+            with open(tmp, "w") as f:
                 json.dump(self.queue, f)
+            os.replace(tmp, self.queue_file)
         except Exception:
             pass
 
@@ -1408,51 +1414,60 @@ class TransferManager:
         dest = body.get("dest", "")
         if not source or not dest:
             return {"ok": False, "msg": "Missing source or destination"}
-        entry = {
-            "source": source,
-            "dest": dest,
-            "source_type": body.get("source_type", ""),
-            "dest_type": body.get("dest_type", ""),
-            "transfers": body.get("transfers", "8"),
-            "excludes": body.get("excludes", []),
-            "bw_limit": body.get("bw_limit", ""),
-            "status": "queued",
-        }
-        self.queue.append(entry)
-        self._save_queue()
-        return {"ok": True, "position": len(self.queue)}
+        if not validate_rclone_input(source, "source") or not validate_rclone_input(dest, "dest"):
+            return {"ok": False, "msg": "Invalid input"}
+        with self.state_lock:
+            entry = {
+                "source": source,
+                "dest": dest,
+                "source_type": body.get("source_type", ""),
+                "dest_type": body.get("dest_type", ""),
+                "transfers": body.get("transfers", "8"),
+                "excludes": body.get("excludes", []),
+                "bw_limit": body.get("bw_limit", ""),
+                "status": "queued",
+            }
+            self.queue.append(entry)
+            self._save_queue()
+            return {"ok": True, "position": len(self.queue)}
 
     def queue_list(self) -> List[Dict[str, Any]]:
         """Return the current queue."""
-        return self.queue
+        with self.state_lock:
+            return list(self.queue)
 
     def queue_remove(self, index: int) -> Dict[str, Any]:
         """Remove an item from the queue by index."""
-        if 0 <= index < len(self.queue):
-            removed = self.queue.pop(index)
-            self._save_queue()
-            return {"ok": True, "removed": removed.get("source", "")}
-        return {"ok": False, "msg": "Invalid queue position"}
+        with self.state_lock:
+            if 0 <= index < len(self.queue):
+                removed = self.queue.pop(index)
+                self._save_queue()
+                return {"ok": True, "removed": removed.get("source", "")}
+            return {"ok": False, "msg": "Invalid queue position"}
 
     def queue_process_next(self) -> Dict[str, Any]:
         """Start the next queued transfer if nothing is running."""
         if self.is_rclone_running():
             return {"ok": False, "msg": "A transfer is already running"}
-        if not self.queue:
-            return {"ok": False, "msg": "Queue is empty"}
-        # Pop the first queued item
-        for _i, item in enumerate(self.queue):
-            if item.get("status") == "queued":
-                item["status"] = "running"
-                self._save_queue()
-                result = self.start_transfer(item)
-                if result.get("ok"):
+        with self.state_lock:
+            if not self.queue:
+                return {"ok": False, "msg": "Queue is empty"}
+            # Mark previously running items as completed
+            for item in self.queue:
+                if item.get("status") == "running":
+                    item["status"] = "completed"
+            # Find next queued item
+            for item in self.queue:
+                if item.get("status") == "queued":
                     item["status"] = "running"
-                else:
-                    item["status"] = "failed"
-                self._save_queue()
-                return result
-        return {"ok": False, "msg": "No queued transfers"}
+                    self._save_queue()
+                    result = self.start_transfer(item)
+                    if not result.get("ok"):
+                        item["status"] = "failed"
+                        self._save_queue()
+                    return result
+            self._save_queue()
+            return {"ok": False, "msg": "No queued transfers"}
 
     # ---- start_transfer ------------------------------------------------------
 

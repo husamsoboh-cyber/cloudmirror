@@ -1098,3 +1098,67 @@ class TestCrashBackoff:
         manager._crash_times = [time.time() - 400, time.time() - 350, time.time() - 310]
         result = manager.resume()
         assert result["ok"] is True
+
+
+# ===========================================================================
+# Transfer Queue
+# ===========================================================================
+
+
+class TestTransferQueue:
+    def test_queue_add(self, manager):
+        """queue_add adds an entry."""
+        result = manager.queue_add({"source": "gdrive:", "dest": "onedrive:"})
+        assert result["ok"] is True
+        assert result["position"] == 1
+        assert len(manager.queue) == 1
+
+    def test_queue_add_missing_source(self, manager):
+        """queue_add rejects missing source."""
+        result = manager.queue_add({"source": "", "dest": "onedrive:"})
+        assert result["ok"] is False
+
+    def test_queue_add_validates_input(self, manager):
+        """queue_add rejects flag injection."""
+        result = manager.queue_add({"source": "--config=/etc/passwd", "dest": "x:"})
+        assert result["ok"] is False
+
+    def test_queue_list(self, manager):
+        """queue_list returns current queue."""
+        manager.queue_add({"source": "a:", "dest": "b:"})
+        manager.queue_add({"source": "c:", "dest": "d:"})
+        items = manager.queue_list()
+        assert len(items) == 2
+        assert items[0]["source"] == "a:"
+
+    def test_queue_remove(self, manager):
+        """queue_remove removes by index."""
+        manager.queue_add({"source": "a:", "dest": "b:"})
+        manager.queue_add({"source": "c:", "dest": "d:"})
+        result = manager.queue_remove(0)
+        assert result["ok"] is True
+        assert len(manager.queue) == 1
+        assert manager.queue[0]["source"] == "c:"
+
+    def test_queue_remove_invalid_index(self, manager):
+        """queue_remove rejects invalid index."""
+        result = manager.queue_remove(99)
+        assert result["ok"] is False
+
+    def test_queue_persists_to_disk(self, manager):
+        """Queue is saved and loaded from disk."""
+        manager.queue_add({"source": "a:", "dest": "b:"})
+        # Reload
+        manager._load_queue()
+        assert len(manager.queue) == 1
+        assert manager.queue[0]["source"] == "a:"
+
+    def test_queue_process_marks_completed(self, manager):
+        """queue_process_next marks running items as completed."""
+        manager.queue = [
+            {"source": "a:", "dest": "b:", "status": "running"},
+            {"source": "c:", "dest": "d:", "status": "queued"},
+        ]
+        # Process should mark first as completed, try to start second
+        manager.queue_process_next()
+        assert manager.queue[0]["status"] == "completed"
