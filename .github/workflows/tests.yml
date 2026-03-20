@@ -10,9 +10,10 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.9", "3.11", "3.12"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
 
@@ -30,5 +31,6 @@ jobs:
       - name: Format check
         run: ruff format --check cloudhop/
 
-      - name: Run tests
-        run: pytest cloudhop/tests/ -v
+      - name: Run tests (unit + stress + integration)
+        run: pytest cloudhop/tests/ -v --timeout=30
+        timeout-minutes: 5
