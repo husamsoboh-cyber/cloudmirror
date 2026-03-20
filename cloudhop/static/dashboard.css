@@ -393,21 +393,22 @@ body::before {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .ctrl-select {
-  padding: 7px 12px;
+  padding: 7px 16px;
   min-height: 34px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-family: var(--body);
-  font-size: 0.8rem;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
   font-weight: 500;
   background: var(--bg-card);
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s;
+  letter-spacing: 0.02em;
 }
 .ctrl-select:hover {
   border-color: var(--border-hover);
-  background: var(--bg-hover);
+  background: var(--bg-card-hover);
 }
 
 

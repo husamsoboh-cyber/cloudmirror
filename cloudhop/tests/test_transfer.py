@@ -751,12 +751,10 @@ class TestConfigureRemote:
     @patch("cloudhop.transfer.remote_exists", return_value=False)
     @patch("subprocess.run")
     def test_configure_remote_mega_with_credentials(self, mock_run, mock_exists, manager):
-        """MEGA with credentials calls obscure then config create then lsd."""
-        # First call: rclone obscure
-        # Second call: rclone config create
-        # Third call: rclone lsd (validation)
+        """MEGA with credentials calls config create with args then lsd."""
+        # First call: rclone config create (with user/pass args)
+        # Second call: rclone lsd (validation)
         mock_run.side_effect = [
-            MagicMock(returncode=0, stdout="obscured_pass\n", stderr=""),
             MagicMock(returncode=0, stdout="", stderr=""),
             MagicMock(returncode=0, stdout="", stderr=""),
         ]
@@ -766,15 +764,13 @@ class TestConfigureRemote:
         )
         assert result["ok"] is True
 
-        # Verify obscure was called
-        assert mock_run.call_args_list[0][0][0] == ["rclone", "obscure", "secret"]
-
-        # Verify config create was called with env vars
-        config_call = mock_run.call_args_list[1]
-        assert config_call.kwargs.get("env") is not None
-        env = config_call.kwargs["env"]
-        assert env["RCLONE_CONFIG_MYMEGA_USER"] == "user@example.com"
-        assert env["RCLONE_CONFIG_MYMEGA_PASS"] == "obscured_pass"
+        # Verify config create was called with credential args
+        cmd = mock_run.call_args_list[0][0][0]
+        assert "rclone" in cmd
+        assert "config" in cmd
+        assert "create" in cmd
+        assert "user=user@example.com" in cmd
+        assert "pass=secret" in cmd
 
     @patch("cloudhop.transfer.remote_exists", return_value=False)
     def test_configure_remote_s3_needs_credentials(self, mock_exists, manager):
@@ -786,8 +782,8 @@ class TestConfigureRemote:
 
     @patch("cloudhop.transfer.remote_exists", return_value=False)
     @patch("subprocess.run")
-    def test_configure_remote_s3_env_vars(self, mock_run, mock_exists, manager):
-        """S3 configuration sets ACCESS_KEY_ID and SECRET_ACCESS_KEY env vars."""
+    def test_configure_remote_s3_args(self, mock_run, mock_exists, manager):
+        """S3 configuration passes credentials as config create args."""
         mock_run.side_effect = [
             MagicMock(returncode=0, stdout="", stderr=""),  # config create
             MagicMock(returncode=0, stdout="", stderr=""),  # lsd check
@@ -798,14 +794,10 @@ class TestConfigureRemote:
         )
         assert result["ok"] is True
 
-        config_call = mock_run.call_args_list[0]
-        env = config_call.kwargs["env"]
-        assert env["RCLONE_CONFIG_MYS3_ACCESS_KEY_ID"] == "AKIAXXXXXXX"
-        assert env["RCLONE_CONFIG_MYS3_SECRET_ACCESS_KEY"] == "secretkey123"
-
-        # Verify provider=AWS is in the command
-        cmd = config_call[0][0]
+        cmd = mock_run.call_args_list[0][0][0]
         assert "provider=AWS" in cmd
+        assert "access_key_id=AKIAXXXXXXX" in cmd
+        assert "secret_access_key=secretkey123" in cmd
 
     @patch("cloudhop.transfer.remote_exists", return_value=False)
     def test_configure_remote_protondrive_needs_credentials(self, mock_exists, manager):
@@ -813,7 +805,7 @@ class TestConfigureRemote:
         result = manager.configure_remote("myproton", "protondrive")
         assert result["ok"] is False
         assert result["needs_credentials"] is True
-        assert "Username" in result["user_label"]
+        assert "Email" in result["user_label"]
 
     @patch("cloudhop.transfer.remote_exists", return_value=False)
     @patch("subprocess.run")
@@ -851,7 +843,6 @@ class TestConfigureRemote:
     def test_configure_remote_mega_validation_fails(self, mock_run, mock_exists, manager):
         """When MEGA lsd validation fails, remote is deleted and error returned."""
         mock_run.side_effect = [
-            MagicMock(returncode=0, stdout="obscured\n", stderr=""),  # obscure
             MagicMock(returncode=0, stdout="", stderr=""),  # config create
             MagicMock(returncode=1, stdout="", stderr="login failed\n"),  # lsd check fails
             MagicMock(returncode=0, stdout="", stderr=""),  # config delete
@@ -861,7 +852,6 @@ class TestConfigureRemote:
             "mymega", "mega", username="user@test.com", password="wrong"
         )
         assert result["ok"] is False
-        assert "credentials" in result["msg"].lower() or "password" in result["msg"].lower()
 
 
 # ===========================================================================

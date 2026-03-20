@@ -34,24 +34,39 @@
 // Drag & drop handler for local folder paths
 function handleDrop(event, inputId) {
   const items = event.dataTransfer.items || event.dataTransfer.files;
-  if (items && items.length > 0) {
-    const item = items[0];
-    if (item.kind === 'file') {
-      const file = item.getAsFile ? item.getAsFile() : item;
-      // file.path is only available in Electron/NW.js (.app version), not in regular browsers
-      const path = file.path || '';
-      const input = document.getElementById(inputId);
-      if (path && input) {
-        input.value = path;
-        input.dispatchEvent(new Event('input'));
-      } else if (input) {
-        // Regular browser - can't get full path, show hint with folder name
-        const name = file.name || '';
-        if (name) {
-          input.placeholder = 'Type the full path to "' + name + '"';
-          input.focus();
-        }
-      }
+  if (!items || items.length === 0) return;
+  const item = items[0];
+  if (item.kind !== 'file') return;
+  const file = item.getAsFile ? item.getAsFile() : item;
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  let path = file.path || '';
+  if (path) {
+    // Detect if a file (not a folder) was dropped - extract parent directory
+    if (file.type || (file.size > 0 && /\.[^/.]+$/.test((path.split('/').pop() || '')))) {
+      const lastSlash = path.lastIndexOf('/');
+      if (lastSlash > 0) path = path.substring(0, lastSlash);
+    }
+    input.value = path;
+    input.dispatchEvent(new Event('input', {bubbles: true}));
+    // Directly enable Next button (belt-and-suspenders, not relying on event alone)
+    if (inputId === 'sourcePathInput') {
+      document.getElementById('sourceNext').disabled = !path;
+    } else if (inputId === 'destPathInput') {
+      document.getElementById('destNext').disabled = !path;
+    }
+  } else {
+    // Regular browser - can't get full path from drag & drop
+    const name = file.name || '';
+    if (!name) return;
+    const errorId = inputId === 'sourcePathInput' ? 'sourcePathError' : 'destPathError';
+    if (file.type || file.size > 0) {
+      // Likely a file, not a folder
+      const el = document.getElementById(errorId);
+      if (el) { el.textContent = 'Please drop a folder, not a file.'; el.style.display = 'block'; setTimeout(() => { el.style.display = 'none'; }, 5000); }
+    } else {
+      input.placeholder = 'Type the full path to "' + name + '"';
+      input.focus();
     }
   }
 }
@@ -500,7 +515,7 @@ async function buildConnectStep() {
   checkAllConnected();
 }
 
-async function connectRemote(name, type, display, username, password) {
+async function connectRemote(name, type, display, username, password, twofa) {
   const safeName = name.replace(/'/g, "\\'");
   const safeType = type.replace(/'/g, "\\'");
   const safeDisplay = display.replace(/'/g, "\\'");
@@ -519,6 +534,7 @@ async function connectRemote(name, type, display, username, password) {
     const body = {name, type};
     if (username) body.username = username;
     if (password) body.password = password;
+    if (twofa) body.twofa = twofa;
     const resp = await fetch('/api/wizard/configure-remote', {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken()},
@@ -535,11 +551,15 @@ async function connectRemote(name, type, display, username, password) {
       statusEl.className = 'connect-status pending';
       const userLabel = data.user_label || 'Username';
       const passLabel = data.pass_label || 'Password';
+      const is2fa = type === 'protondrive';
+      const twofaHtml = is2fa ? `<input class="form-input" id="cred-2fa-${safeName}" type="text" placeholder="2FA code (if enabled)" style="padding:8px 12px;font-size:0.8rem;" maxlength="6" inputmode="numeric">` : '';
+      const twofaArg = is2fa ? `,(document.getElementById('cred-2fa-${safeName}')||{}).value||''` : '';
       actionEl.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:8px;min-width:220px;">
           <input class="form-input" id="cred-user-${safeName}" type="text" placeholder="${userLabel}" style="padding:8px 12px;font-size:0.8rem;">
           <input class="form-input" id="cred-pass-${safeName}" type="password" placeholder="${passLabel}" style="padding:8px 12px;font-size:0.8rem;">
-          <button class="btn btn-primary btn-connect" onclick="connectRemote('${safeName}','${safeType}','${safeDisplay}', document.getElementById('cred-user-${safeName}').value, document.getElementById('cred-pass-${safeName}').value)">Connect</button>
+          ${twofaHtml}
+          <button class="btn btn-primary btn-connect" onclick="connectRemote('${safeName}','${safeType}','${safeDisplay}', document.getElementById('cred-user-${safeName}').value, document.getElementById('cred-pass-${safeName}').value${twofaArg})">Connect</button>
         </div>`;
     } else {
       statusEl.textContent = data.msg || 'Failed to connect';

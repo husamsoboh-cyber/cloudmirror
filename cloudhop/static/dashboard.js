@@ -501,6 +501,13 @@ async function refresh() {
       if (btnResume2) btnResume2.style.display = 'none';
       const btnPause2 = document.getElementById('btnPause2');
       if (btnPause2) btnPause2.style.display = 'none';
+      // Show persistent completion banner on dashboard
+      const cBanner = document.getElementById('completionBanner');
+      if (cBanner) {
+        cBanner.style.display = '';
+        const cMsg = document.getElementById('completionBannerMsg');
+        if (cMsg) cMsg.textContent = (d.global_files_done ? d.global_files_done.toLocaleString() : '0') + ' files (' + (d.global_transferred || '--') + ') copied successfully. You can close this window or start a new transfer.';
+      }
       if (!completionShown && d.global_pct >= 100) {
           completionShown = true;
           showCompletionScreen(d);

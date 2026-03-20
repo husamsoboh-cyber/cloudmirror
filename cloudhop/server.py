@@ -389,8 +389,13 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
             ):
                 self._send_json({"ok": False, "msg": "Invalid input"})
             else:
+                twofa = body.get("twofa", "")
+                if twofa and (len(twofa) != 6 or not twofa.isdigit()):
+                    self._send_json({"ok": False, "msg": "Invalid 2FA code"}, 400)
+                    return
                 result = self.manager.configure_remote(
-                    name, rtype, username=username, password=password
+                    name, rtype, username=username, password=password,
+                    twofa=twofa or None,
                 )
                 self._send_json(result)
         elif self.path == "/api/wizard/check-remote":
@@ -441,7 +446,12 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                     return
                 try:
                     result = subprocess.run(
-                        ["rclone", "size", source, "--json"],
+                        [
+                            "rclone", "size", source, "--json",
+                            "--exclude=.DS_Store",
+                            "--exclude=.localized",
+                            "--exclude=._*",
+                        ],
                         capture_output=True,
                         text=True,
                         timeout=RCLONE_PREVIEW_TIMEOUT_SEC,

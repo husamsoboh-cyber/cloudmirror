@@ -108,7 +108,7 @@
           <div style="font-size:0.85rem;color:var(--text-dim);margin-bottom:4px;">Drag a folder here</div>
           <div style="font-size:0.7rem;color:var(--text-muted);">or type the path below</div>
         </div>
-        <input class="form-input" id="sourcePathInput" type="text" placeholder="e.g. /Users/you/Documents">
+        <input class="form-input" id="sourcePathInput" type="text" placeholder="e.g. /Users/you/Documents" oninput="if(typeof sourceProvider!=='undefined'&&(sourceProvider==='local'||sourceProvider==='icloud'))document.getElementById('sourceNext').disabled=!this.value.trim()">
         <div id="sourcePathError" style="display:none;font-size:0.75rem;color:var(--red);margin-top:6px;"></div>
         <div class="form-hint">The folder on your computer where your files are stored.</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
@@ -181,7 +181,7 @@
           <div style="font-size:0.85rem;color:var(--text-dim);margin-bottom:4px;">Drag a folder here</div>
           <div style="font-size:0.7rem;color:var(--text-muted);">or type the path below</div>
         </div>
-        <input class="form-input" id="destPathInput" type="text" placeholder="e.g. /Users/you/Desktop/Backup">
+        <input class="form-input" id="destPathInput" type="text" placeholder="e.g. /Users/you/Desktop/Backup" oninput="if(typeof destProvider!=='undefined'&&(destProvider==='local'||destProvider==='icloud'))document.getElementById('destNext').disabled=!this.value.trim()">
         <div id="destPathError" style="display:none;font-size:0.75rem;color:var(--red);margin-top:6px;"></div>
         <div class="form-hint">Where to save the copied files on your computer.</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
@@ -368,10 +368,10 @@
       <button class="btn btn-secondary" onclick="goTo(5)" style="align-self:flex-start;">Back</button>
     </div>
   </div>
-</div>
 
-<div style="text-align:center;margin-top:32px;font-size:0.7rem;color:var(--text-muted);">
-  <a href="https://github.com/husamsoboh-cyber/cloudhop/issues/new?template=bug_report.md" target="_blank" rel="noopener noreferrer" style="color:var(--text-muted);text-decoration:none;">Need help?</a> &middot; <a href="https://github.com/husamsoboh-cyber/cloudhop/discussions/new?category=feedback" target="_blank" rel="noopener noreferrer" style="color:var(--text-muted);text-decoration:none;">Send feedback</a>
+  <div style="text-align:center;margin-top:32px;font-size:0.7rem;color:var(--text-muted);">
+    <a href="https://github.com/husamsoboh-cyber/cloudhop/issues/new?template=bug_report.md" target="_blank" rel="noopener noreferrer" style="color:var(--text-muted);text-decoration:none;">Need help?</a> &middot; <a href="https://github.com/husamsoboh-cyber/cloudhop/discussions/new?category=feedback" target="_blank" rel="noopener noreferrer" style="color:var(--text-muted);text-decoration:none;">Send feedback</a>
+  </div>
 </div>
 
 <script src="/static/wizard.js"></script>

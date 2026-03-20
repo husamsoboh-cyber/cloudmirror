@@ -1388,11 +1388,19 @@ class TransferManager:
             if result.returncode == 0:
                 logger.info("Bandwidth changed to %s", limit)
                 return {"ok": True}
-            logger.warning("Bandwidth change failed: %s", result.stderr.strip())
-            return {"ok": False, "msg": result.stderr.strip()}
+            stderr = result.stderr.strip()
+            if "connection refused" in stderr.lower() or "connection failed" in stderr.lower():
+                logger.debug("RC API not available, skipping bandwidth change")
+            else:
+                logger.warning("Bandwidth change failed: %s", stderr)
+            return {"ok": False, "msg": stderr}
         except Exception as e:
-            logger.error("Bandwidth change error: %s", e)
-            return {"ok": False, "msg": str(e)}
+            err_str = str(e)
+            if "connection refused" in err_str.lower():
+                logger.debug("RC API not available, skipping bandwidth change")
+            else:
+                logger.error("Bandwidth change error: %s", e)
+            return {"ok": False, "msg": err_str}
 
     def verify_transfer(self) -> Dict[str, Any]:
         """Run rclone check to verify source matches destination."""
@@ -1620,6 +1628,13 @@ class TransferManager:
                 ]
             )
 
+        # Exclude macOS system metadata files from all transfers
+        self.rclone_cmd.extend([
+            "--exclude=.DS_Store",
+            "--exclude=.localized",
+            "--exclude=._*",
+        ])
+
         for excl in excludes:
             if excl:
                 self.rclone_cmd.append(f"--exclude={excl}/**")
@@ -1697,6 +1712,7 @@ class TransferManager:
         provider_type: str,
         username: Optional[str] = None,
         password: Optional[str] = None,
+        twofa: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Configure an rclone remote non-interactively (for web wizard)."""
         if provider_type == "local":
@@ -1710,8 +1726,6 @@ class TransferManager:
         if password and not validate_rclone_input(password, "password"):
             return {"ok": False, "msg": "Invalid password"}
 
-        env: Optional[Dict[str, str]] = None
-
         if provider_type == "mega":
             if not username or not password:
                 return {
@@ -1721,39 +1735,25 @@ class TransferManager:
                     "user_label": "Email",
                     "pass_label": "Password",
                 }
-            result = subprocess.run(
-                ["rclone", "obscure", password],
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
-                return {"ok": False, "msg": "Failed to process credentials"}
-            obscured = result.stdout.strip()
-            env = os.environ.copy()
-            env[f"RCLONE_CONFIG_{name.upper()}_USER"] = username
-            env[f"RCLONE_CONFIG_{name.upper()}_PASS"] = obscured
-            cmd = ["rclone", "config", "create", name, provider_type]
+            cmd = [
+                "rclone", "config", "create", name, provider_type,
+                f"user={username}", f"pass={password}",
+            ]
         elif provider_type == "protondrive":
             if not username or not password:
                 return {
                     "ok": False,
                     "needs_credentials": True,
-                    "msg": "Proton Drive requires your Proton username and password.",
-                    "user_label": "Username",
-                    "pass_label": "Password",
+                    "msg": "Use your Proton email and account password (not Bridge password).",
+                    "user_label": "Proton Email",
+                    "pass_label": "Account Password",
                 }
-            result = subprocess.run(
-                ["rclone", "obscure", password],
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
-                return {"ok": False, "msg": "Failed to process credentials"}
-            obscured_pw = result.stdout.strip()
-            env = os.environ.copy()
-            env[f"RCLONE_CONFIG_{name.upper()}_USERNAME"] = username
-            env[f"RCLONE_CONFIG_{name.upper()}_PASSWORD"] = obscured_pw
-            cmd = ["rclone", "config", "create", name, provider_type]
+            cmd = [
+                "rclone", "config", "create", name, provider_type,
+                f"username={username}", f"password={password}",
+            ]
+            if twofa:
+                cmd.append(f"2fa={twofa}")
         elif provider_type == "s3":
             if not username or not password:
                 return {
@@ -1763,9 +1763,6 @@ class TransferManager:
                     "user_label": "Access Key ID",
                     "pass_label": "Secret Access Key",
                 }
-            env = os.environ.copy()
-            env[f"RCLONE_CONFIG_{name.upper()}_ACCESS_KEY_ID"] = username
-            env[f"RCLONE_CONFIG_{name.upper()}_SECRET_ACCESS_KEY"] = password
             cmd = [
                 "rclone",
                 "config",
@@ -1773,19 +1770,19 @@ class TransferManager:
                 name,
                 provider_type,
                 "provider=AWS",
+                f"access_key_id={username}",
+                f"secret_access_key={password}",
             ]
         else:
             # OAuth-based providers
             cmd = ["rclone", "config", "create", name, provider_type]
 
         try:
-            run_env = env if provider_type in ("s3", "mega", "protondrive") else None
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 timeout=RCLONE_CONFIG_TIMEOUT_SEC,
-                env=run_env,
             )
             if result.returncode == 0:
                 # Validate the remote actually works
