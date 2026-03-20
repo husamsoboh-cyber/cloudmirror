@@ -3,6 +3,7 @@
 import json
 import os
 import signal
+import subprocess
 import textwrap
 import threading
 from unittest.mock import MagicMock, patch
@@ -967,3 +968,133 @@ class TestEdgeCases:
             result = manager.resume()
             assert result["ok"] is True
             assert manager.rclone_pid == 7777
+
+
+# ===========================================================================
+# Verify Transfer
+# ===========================================================================
+
+
+class TestVerifyTransfer:
+    def test_verify_no_command(self, manager):
+        """verify_transfer returns error when no command is configured."""
+        manager.rclone_cmd = []
+        result = manager.verify_transfer()
+        assert result["ok"] is False
+        assert "No transfer" in result["msg"]
+
+    @patch("os.waitpid", return_value=(0, 0))
+    def test_verify_while_running(self, mock_waitpid, manager):
+        """verify_transfer returns error when rclone is still running."""
+        manager.rclone_pid = 1234
+        manager.rclone_cmd = ["rclone", "copy", "src:", "dst:"]
+        result = manager.verify_transfer()
+        assert result["ok"] is False
+        assert "still running" in result["msg"]
+
+    @patch("subprocess.run")
+    def test_verify_perfect(self, mock_run, manager):
+        """verify_transfer returns perfect when rclone check passes."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        manager.rclone_cmd = ["rclone", "copy", "src:", "dst:", "--exclude=Trash/**"]
+        manager.rclone_pid = None
+        result = manager.verify_transfer()
+        assert result["ok"] is True
+        assert result["status"] == "perfect"
+        # Verify exclude flag was passed to check command
+        cmd = mock_run.call_args[0][0]
+        assert "--exclude=Trash/**" in cmd
+        assert cmd[0] == "rclone"
+        assert cmd[1] == "check"
+
+    @patch("subprocess.run")
+    def test_verify_differences(self, mock_run, manager):
+        """verify_transfer reports differences when files are missing."""
+        mock_run.return_value = MagicMock(
+            returncode=1,
+            stdout="",
+            stderr="ERROR : file.txt: not in destination\n",
+        )
+        manager.rclone_cmd = ["rclone", "copy", "src:", "dst:"]
+        manager.rclone_pid = None
+        result = manager.verify_transfer()
+        assert result["ok"] is True
+        assert result["status"] == "differences"
+        assert result["differences"] == 1
+
+    @patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="rclone", timeout=600))
+    def test_verify_timeout(self, mock_run, manager):
+        """verify_transfer handles timeout."""
+        manager.rclone_cmd = ["rclone", "copy", "src:", "dst:"]
+        manager.rclone_pid = None
+        result = manager.verify_transfer()
+        assert result["ok"] is False
+        assert "timed out" in result["msg"]
+
+
+# ===========================================================================
+# Battery Check
+# ===========================================================================
+
+
+class TestBatteryCheck:
+    @patch("platform.system", return_value="Linux")
+    def test_not_mac(self, mock_sys, manager):
+        """_is_on_battery returns False on non-Mac."""
+        assert manager._is_on_battery() is False
+
+    @patch("platform.system", return_value="Darwin")
+    @patch("subprocess.run")
+    def test_on_ac(self, mock_run, mock_sys, manager):
+        """_is_on_battery returns False on AC power."""
+        mock_run.return_value = MagicMock(stdout="'AC Power'")
+        assert manager._is_on_battery() is False
+
+    @patch("platform.system", return_value="Darwin")
+    @patch("subprocess.run")
+    def test_on_battery(self, mock_run, mock_sys, manager):
+        """_is_on_battery returns True on battery."""
+        mock_run.return_value = MagicMock(stdout="'Battery Power'")
+        assert manager._is_on_battery() is True
+
+    def test_battery_check_disabled(self, manager):
+        """_check_battery does nothing when pause_on_battery is False."""
+        manager.state["pause_on_battery"] = False
+        manager._check_battery()  # should not raise
+
+
+# ===========================================================================
+# Crash Backoff
+# ===========================================================================
+
+
+class TestCrashBackoff:
+    @patch("subprocess.Popen")
+    def test_backoff_after_3_crashes(self, mock_popen, manager):
+        """resume returns error after 3 rapid failures."""
+        mock_proc = MagicMock()
+        mock_proc.pid = 1111
+        mock_popen.return_value = mock_proc
+        manager.rclone_cmd = ["rclone", "copy", "a:", "b:"]
+
+        # First 3 resumes should succeed
+        import time
+
+        manager._crash_times = [time.time() - 10, time.time() - 5, time.time() - 1]
+        result = manager.resume()
+        assert result["ok"] is False
+        assert "keeps failing" in result["msg"]
+
+    @patch("subprocess.Popen")
+    def test_backoff_resets_after_5min(self, mock_popen, manager):
+        """resume works again after 5 minutes of backoff."""
+        mock_proc = MagicMock()
+        mock_proc.pid = 2222
+        mock_popen.return_value = mock_proc
+        manager.rclone_cmd = ["rclone", "copy", "a:", "b:"]
+
+        import time
+
+        manager._crash_times = [time.time() - 400, time.time() - 350, time.time() - 310]
+        result = manager.resume()
+        assert result["ok"] is True
