@@ -279,7 +279,7 @@ All notable changes to CloudHop are documented here.
 - Input validation prevents rclone flag injection
 - Request body size limited to 10 KB
 - Credentials obscured before saving
-- State files stored in ~/.cloudmirror/ with 0700 permissions
+- State files stored in ~/.cloudhop/ with 0700 permissions
 
 ### Accessibility
 - Provider cards keyboard-accessible (tabindex, role, onkeydown)
