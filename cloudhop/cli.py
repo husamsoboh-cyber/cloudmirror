@@ -56,14 +56,26 @@ def _on_signal(sig, frame):
 
 # Prefixes whose values must be masked in displayed commands
 _SENSITIVE_PREFIXES = (
-    "user=", "pass=", "password=", "username=",
-    "secret_access_key=", "access_key_id=", "2fa=",
-    "--rc-user=", "--rc-pass=",
-    "--mega-pass=", "--mega-user=",
-    "--s3-secret-access-key=", "--s3-access-key-id=",
-    "--protondrive-password=", "--protondrive-username=",
-    "--ftp-pass=", "--ftp-user=",
-    "--sftp-pass=", "--sftp-user=", "--sftp-key-file=",
+    "user=",
+    "pass=",
+    "password=",
+    "username=",
+    "secret_access_key=",
+    "access_key_id=",
+    "2fa=",
+    "--rc-user=",
+    "--rc-pass=",
+    "--mega-pass=",
+    "--mega-user=",
+    "--s3-secret-access-key=",
+    "--s3-access-key-id=",
+    "--protondrive-password=",
+    "--protondrive-username=",
+    "--ftp-pass=",
+    "--ftp-user=",
+    "--sftp-pass=",
+    "--sftp-user=",
+    "--sftp-key-file=",
 )
 
 
@@ -247,8 +259,6 @@ def main() -> None:
             start_dashboard(manager, start_rclone=True)
 
 
-
-
 def start_dashboard(manager: TransferManager, start_rclone: bool = False) -> None:
     """Start the web dashboard and optionally the rclone process."""
     import subprocess
@@ -350,6 +360,7 @@ def start_dashboard(manager: TransferManager, start_rclone: bool = False) -> Non
     if not force_browser:
         try:
             import webview
+
             # HTTP server runs in background, native window takes the main thread
             server_thread = threading.Thread(target=server.serve_forever, daemon=True)
             server_thread.start()
@@ -377,6 +388,7 @@ def start_dashboard(manager: TransferManager, start_rclone: bool = False) -> Non
         webbrowser.open(url)
     except Exception:
         pass
+
     # Monitor for SIGTERM to perform graceful shutdown
     def _shutdown_watcher():
         _shutdown_requested.wait()

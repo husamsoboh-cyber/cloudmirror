@@ -503,9 +503,7 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                         timeout=120,
                     )
                     if dl_result.returncode != 0:
-                        logger.error(
-                            "Failed to download rclone binary: %s", dl_result.stderr
-                        )
+                        logger.error("Failed to download rclone binary: %s", dl_result.stderr)
                         self._send_json(
                             {
                                 "ok": False,
@@ -522,9 +520,7 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                         timeout=30,
                     )
                     if cs_result.returncode != 0:
-                        logger.error(
-                            "Failed to download checksum file: %s", cs_result.stderr
-                        )
+                        logger.error("Failed to download checksum file: %s", cs_result.stderr)
                         self._send_json(
                             {
                                 "ok": False,
@@ -630,7 +626,10 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                 try:
                     logger.info("configure-remote: acquired lock for remote '%s'", name)
                     result = self.manager.configure_remote(
-                        name, rtype, username=username, password=password,
+                        name,
+                        rtype,
+                        username=username,
+                        password=password,
                         twofa=twofa or None,
                     )
                 finally:
@@ -660,9 +659,7 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                 home = os.path.expanduser("~")
                 real_path = os.path.realpath(os.path.expandvars(source))
                 if not real_path.startswith(home + os.sep) and real_path != home:
-                    logger.info(
-                        "Browse blocked: path %s is outside home directory", source
-                    )
+                    logger.info("Browse blocked: path %s is outside home directory", source)
                     self._send_json(
                         {"ok": False, "msg": "Browsing is restricted to home directory"},
                         403,
@@ -701,7 +698,10 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                 try:
                     result = subprocess.run(
                         [
-                            "rclone", "size", source, "--json",
+                            "rclone",
+                            "size",
+                            source,
+                            "--json",
                             "--exclude=.DS_Store",
                             "--exclude=.localized",
                             "--exclude=._*",
@@ -811,7 +811,7 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"ok": False, "msg": "Invalid request"}, 400)
                 return
             transfer_id = body.get("id", "")
-            if not transfer_id or not re.match(r'^[0-9a-f]{8}$', transfer_id):
+            if not transfer_id or not re.match(r"^[0-9a-f]{8}$", transfer_id):
                 logger.info("Invalid transfer ID format rejected: %r", transfer_id)
                 self._send_json({"ok": False, "msg": "Invalid transfer ID"}, 400)
                 return
@@ -832,7 +832,9 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                     return
                 if not validate_rclone_cmd(cmd):
                     logger.error("History resume refused: command failed validation: %s", cmd)
-                    self._send_json({"ok": False, "msg": "Saved command failed security validation"}, 400)
+                    self._send_json(
+                        {"ok": False, "msg": "Saved command failed security validation"}, 400
+                    )
                     return
                 # Switch manager to this transfer (under lock)
                 log_file = os.path.join(_CM_DIR, f"cloudhop_{transfer_id}.log")

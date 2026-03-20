@@ -197,14 +197,35 @@ def remote_exists(name: str) -> bool:
 # are accepted; bare positional args are allowed only if they look like paths
 # (no shell metacharacters).
 _KNOWN_RCLONE_FLAGS = {
-    "--bwlimit", "--buffer-size", "--checkers", "--checksum",
-    "--config", "--contimeout", "--create-empty-src-dirs",
-    "--drive-chunk-size", "--dry-run", "--exclude",
-    "--fast-list", "--include", "--log-file", "--log-level",
-    "--low-level-retries", "--multi-thread-streams", "--no-traverse",
-    "--progress", "--rc", "--rc-addr", "--rc-pass", "--rc-user",
-    "--retries", "--stats", "--stats-log-level", "--timeout",
-    "--tpslimit", "--transfers", "--verbose",
+    "--bwlimit",
+    "--buffer-size",
+    "--checkers",
+    "--checksum",
+    "--config",
+    "--contimeout",
+    "--create-empty-src-dirs",
+    "--drive-chunk-size",
+    "--dry-run",
+    "--exclude",
+    "--fast-list",
+    "--include",
+    "--log-file",
+    "--log-level",
+    "--low-level-retries",
+    "--multi-thread-streams",
+    "--no-traverse",
+    "--progress",
+    "--rc",
+    "--rc-addr",
+    "--rc-pass",
+    "--rc-user",
+    "--retries",
+    "--stats",
+    "--stats-log-level",
+    "--timeout",
+    "--tpslimit",
+    "--transfers",
+    "--verbose",
 }
 
 _SHELL_META = set(";&|`$(){}!><\n\r\0")
@@ -510,8 +531,9 @@ class TransferManager:
                 # psutil is optional -- if unavailable, assume running.
                 try:
                     import psutil
+
                     p = psutil.Process(pid)
-                    return 'rclone' in p.name().lower()
+                    return "rclone" in p.name().lower()
                 except ImportError:
                     return True
                 except Exception:
@@ -1287,7 +1309,9 @@ class TransferManager:
             # Clear stale active transfers when transfer is truly complete
             if result["finished"] and global_pct >= 100:
                 result["active"] = []
-                logger.debug("Transfer complete (%.1f%%) — cleared active transfers list", global_pct)
+                logger.debug(
+                    "Transfer complete (%.1f%%) — cleared active transfers list", global_pct
+                )
             result["global_elapsed"] = fmt_duration(global_elapsed_sec)
             result["global_elapsed_sec"] = global_elapsed_sec
             result["session_elapsed_sec"] = session_elapsed_sec
@@ -1393,8 +1417,7 @@ class TransferManager:
 
         # Grace period: avoid false "Stopped" status while rclone RC is booting
         just_started = (
-            self._transfer_start_time is not None
-            and (time.time() - self._transfer_start_time) < 10
+            self._transfer_start_time is not None and (time.time() - self._transfer_start_time) < 10
         )
         result["just_started"] = just_started
 
@@ -1506,11 +1529,13 @@ class TransferManager:
         try:
             rc_cmd = ["rclone", "rc", "core/bwlimit", f"rate={limit}"]
             if self._rc_user and self._rc_pass and self._rc_port:
-                rc_cmd.extend([
-                    f"--rc-user={self._rc_user}",
-                    f"--rc-pass={self._rc_pass}",
-                    f"--rc-addr=127.0.0.1:{self._rc_port}",
-                ])
+                rc_cmd.extend(
+                    [
+                        f"--rc-user={self._rc_user}",
+                        f"--rc-pass={self._rc_pass}",
+                        f"--rc-addr=127.0.0.1:{self._rc_port}",
+                    ]
+                )
             result = subprocess.run(
                 rc_cmd,
                 capture_output=True,
@@ -1765,11 +1790,13 @@ class TransferManager:
         self._rc_user = secrets.token_hex(16)
         self._rc_pass = secrets.token_hex(16)
         self._rc_port = self._find_free_port()
-        self.rclone_cmd.extend([
-            f"--rc-user={self._rc_user}",
-            f"--rc-pass={self._rc_pass}",
-            f"--rc-addr=127.0.0.1:{self._rc_port}",
-        ])
+        self.rclone_cmd.extend(
+            [
+                f"--rc-user={self._rc_user}",
+                f"--rc-pass={self._rc_pass}",
+                f"--rc-addr=127.0.0.1:{self._rc_port}",
+            ]
+        )
         logger.info("RC API auth configured on port %d", self._rc_port)
 
         # Cloud-to-cloud transfers benefit from larger chunks and buffers
@@ -1783,11 +1810,13 @@ class TransferManager:
             )
 
         # Exclude macOS system metadata files from all transfers
-        self.rclone_cmd.extend([
-            "--exclude=.DS_Store",
-            "--exclude=.localized",
-            "--exclude=._*",
-        ])
+        self.rclone_cmd.extend(
+            [
+                "--exclude=.DS_Store",
+                "--exclude=.localized",
+                "--exclude=._*",
+            ]
+        )
 
         for excl in excludes:
             if excl:
@@ -1819,11 +1848,13 @@ class TransferManager:
                 "--checkers=4" if flag.startswith("--checkers=") else flag
                 for flag in self.rclone_cmd
             ]
-            self.rclone_cmd.extend([
-                "--tpslimit=4",
-                "--retries=5",
-                "--low-level-retries=10",
-            ])
+            self.rclone_cmd.extend(
+                [
+                    "--tpslimit=4",
+                    "--retries=5",
+                    "--low-level-retries=10",
+                ]
+            )
             logger.info("Proton Drive: applied rate limit protection flags")
 
         # Save rclone_cmd to state but strip flags that contain credentials.
@@ -1909,8 +1940,13 @@ class TransferManager:
                     "pass_label": "Password",
                 }
             cmd = [
-                "rclone", "config", "create", name, provider_type,
-                f"user={username}", f"pass={password}",
+                "rclone",
+                "config",
+                "create",
+                name,
+                provider_type,
+                f"user={username}",
+                f"pass={password}",
             ]
         elif provider_type == "protondrive":
             if not username or not password:
@@ -1922,8 +1958,13 @@ class TransferManager:
                     "pass_label": "Account Password",
                 }
             cmd = [
-                "rclone", "config", "create", name, provider_type,
-                f"username={username}", f"password={password}",
+                "rclone",
+                "config",
+                "create",
+                name,
+                provider_type,
+                f"username={username}",
+                f"password={password}",
             ]
             if twofa:
                 cmd.append(f"2fa={twofa}")
@@ -1964,7 +2005,9 @@ class TransferManager:
                         logger.info("OneDrive: configuring drive_id and drive_type")
                         dump = subprocess.run(
                             ["rclone", "config", "dump"],
-                            capture_output=True, text=True, timeout=10,
+                            capture_output=True,
+                            text=True,
+                            timeout=10,
                         )
                         if dump.returncode == 0:
                             cfg = json.loads(dump.stdout)
@@ -1972,7 +2015,9 @@ class TransferManager:
                             if not remote_cfg.get("drive_id"):
                                 drives_result = subprocess.run(
                                     ["rclone", "backend", "drives", f"{name}:"],
-                                    capture_output=True, text=True, timeout=30,
+                                    capture_output=True,
+                                    text=True,
+                                    timeout=30,
                                 )
                                 if drives_result.returncode == 0:
                                     drives = json.loads(drives_result.stdout)
@@ -1981,26 +2026,37 @@ class TransferManager:
                                         drive_id = drive.get("id", "")
                                         drive_type = drive.get("driveType", "personal")
                                         subprocess.run(
-                                            ["rclone", "config", "update", name,
-                                             f"drive_id={drive_id}",
-                                             f"drive_type={drive_type}"],
-                                            capture_output=True, text=True, timeout=10,
+                                            [
+                                                "rclone",
+                                                "config",
+                                                "update",
+                                                name,
+                                                f"drive_id={drive_id}",
+                                                f"drive_type={drive_type}",
+                                            ],
+                                            capture_output=True,
+                                            text=True,
+                                            timeout=10,
                                         )
                                         logger.info(
                                             "OneDrive: auto-set drive_id=%s drive_type=%s",
-                                            drive_id, drive_type,
+                                            drive_id,
+                                            drive_type,
                                         )
                                 else:
                                     # Fallback: set drive_type and trigger auto-detection via lsd
                                     logger.info("OneDrive: backend drives failed, trying fallback")
                                     subprocess.run(
-                                        ["rclone", "config", "update", name,
-                                         "drive_type=personal"],
-                                        capture_output=True, text=True, timeout=10,
+                                        ["rclone", "config", "update", name, "drive_type=personal"],
+                                        capture_output=True,
+                                        text=True,
+                                        timeout=10,
                                     )
                                     subprocess.run(
                                         ["rclone", "lsd", f"{name}:"],
-                                        capture_output=True, text=True, timeout=30,
+                                        capture_output=True,
+                                        text=True,
+                                        timeout=30,
                                     )
                     except Exception as exc:
                         logger.warning("OneDrive: drive_id auto-detection failed: %s", exc)
