@@ -201,6 +201,11 @@ class TransferManager:
         self.state_file: str = os.path.join(self.cm_dir, "cloudhop_state.json")
         self.transfer_label: str = "Source -> Destination"
 
+        # Transfer queue
+        self.queue: List[Dict[str, Any]] = []
+        self.queue_file: str = os.path.join(self.cm_dir, "queue.json")
+        self._load_queue()
+
         # Locks
         self.state_lock: threading.RLock = threading.RLock()
         self.transfer_lock: threading.Lock = threading.Lock()
@@ -1379,6 +1384,76 @@ class TransferManager:
         except Exception as e:
             return {"ok": False, "msg": f"Verification failed: {str(e)}"}
 
+    # ---- transfer queue ------------------------------------------------------
+
+    def _load_queue(self) -> None:
+        """Load queue from disk."""
+        try:
+            with open(self.queue_file, "r") as f:
+                self.queue = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.queue = []
+
+    def _save_queue(self) -> None:
+        """Save queue to disk."""
+        try:
+            with open(self.queue_file, "w") as f:
+                json.dump(self.queue, f)
+        except Exception:
+            pass
+
+    def queue_add(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        """Add a transfer to the queue."""
+        source = body.get("source", "")
+        dest = body.get("dest", "")
+        if not source or not dest:
+            return {"ok": False, "msg": "Missing source or destination"}
+        entry = {
+            "source": source,
+            "dest": dest,
+            "source_type": body.get("source_type", ""),
+            "dest_type": body.get("dest_type", ""),
+            "transfers": body.get("transfers", "8"),
+            "excludes": body.get("excludes", []),
+            "bw_limit": body.get("bw_limit", ""),
+            "status": "queued",
+        }
+        self.queue.append(entry)
+        self._save_queue()
+        return {"ok": True, "position": len(self.queue)}
+
+    def queue_list(self) -> List[Dict[str, Any]]:
+        """Return the current queue."""
+        return self.queue
+
+    def queue_remove(self, index: int) -> Dict[str, Any]:
+        """Remove an item from the queue by index."""
+        if 0 <= index < len(self.queue):
+            removed = self.queue.pop(index)
+            self._save_queue()
+            return {"ok": True, "removed": removed.get("source", "")}
+        return {"ok": False, "msg": "Invalid queue position"}
+
+    def queue_process_next(self) -> Dict[str, Any]:
+        """Start the next queued transfer if nothing is running."""
+        if self.is_rclone_running():
+            return {"ok": False, "msg": "A transfer is already running"}
+        if not self.queue:
+            return {"ok": False, "msg": "Queue is empty"}
+        # Pop the first queued item
+        for _i, item in enumerate(self.queue):
+            if item.get("status") == "queued":
+                item["status"] = "running"
+                self._save_queue()
+                result = self.start_transfer(item)
+                if result.get("ok"):
+                    item["status"] = "running"
+                else:
+                    item["status"] = "failed"
+                self._save_queue()
+                return result
+        return {"ok": False, "msg": "No queued transfers"}
+
     # ---- start_transfer ------------------------------------------------------
 
     def start_transfer(self, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -1720,6 +1795,9 @@ class TransferManager:
                 self.scan_full_log()
                 self._check_schedule()
                 self._check_battery()
+                # Auto-process queue when current transfer finishes
+                if not self.is_rclone_running() and self.queue:
+                    self.queue_process_next()
             except Exception as e:
                 print(f"Scanner error: {e}")
             time.sleep(SCANNER_INTERVAL_SEC)

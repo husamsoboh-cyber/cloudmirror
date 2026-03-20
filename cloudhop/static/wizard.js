@@ -31,6 +31,28 @@
  *   `rclone config create <name> <type>`.  The remote name used in rclone
  *   paths (e.g. "gdrive:Photos") is stored in sourceName / destName.
  */
+// Drag & drop handler for local folder paths
+function handleDrop(event, inputId) {
+  const items = event.dataTransfer.items || event.dataTransfer.files;
+  if (items && items.length > 0) {
+    // Try to get the path from the dropped item
+    const item = items[0];
+    if (item.kind === 'file') {
+      const file = item.getAsFile ? item.getAsFile() : item;
+      // Browsers expose .path for local files in Electron/NW.js, but not in regular browsers.
+      // For regular browsers, we use the file name as a hint.
+      const path = file.path || file.name || '';
+      if (path) {
+        const input = document.getElementById(inputId);
+        if (input) {
+          input.value = path;
+          input.dispatchEvent(new Event('input'));
+        }
+      }
+    }
+  }
+}
+
 window.onerror = function(msg) {
   const el = document.querySelector('.wizard-subtitle');
   if (el && !document.getElementById('_jsErr')) {

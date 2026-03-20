@@ -104,6 +104,10 @@
     <div class="local-path-input" id="sourceLocalPath">
       <div class="form-group" style="margin-top:16px;">
         <label class="form-label" for="sourcePathInput">Folder Path</label>
+        <div id="sourceDropZone" style="border:2px dashed var(--card-border);border-radius:10px;padding:20px;text-align:center;margin-bottom:8px;transition:all 0.2s;cursor:pointer;" ondragover="event.preventDefault();this.style.borderColor='var(--blue)';this.style.background='rgba(99,102,241,0.05)'" ondragleave="this.style.borderColor='var(--card-border)';this.style.background=''" ondrop="event.preventDefault();this.style.borderColor='var(--card-border)';this.style.background='';handleDrop(event,'sourcePathInput')">
+          <div style="font-size:0.85rem;color:var(--text-dim);margin-bottom:4px;">Drag a folder here</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);">or type the path below</div>
+        </div>
         <input class="form-input" id="sourcePathInput" type="text" placeholder="e.g. /Users/you/Documents">
         <div id="sourcePathError" style="display:none;font-size:0.75rem;color:var(--red);margin-top:6px;"></div>
         <div class="form-hint">The folder on your computer where your files are stored.</div>
@@ -173,6 +177,10 @@
     <div class="local-path-input" id="destLocalPath">
       <div class="form-group" style="margin-top:16px;">
         <label class="form-label" for="destPathInput">Save to Folder</label>
+        <div id="destDropZone" style="border:2px dashed var(--card-border);border-radius:10px;padding:20px;text-align:center;margin-bottom:8px;transition:all 0.2s;cursor:pointer;" ondragover="event.preventDefault();this.style.borderColor='var(--blue)';this.style.background='rgba(99,102,241,0.05)'" ondragleave="this.style.borderColor='var(--card-border)';this.style.background=''" ondrop="event.preventDefault();this.style.borderColor='var(--card-border)';this.style.background='';handleDrop(event,'destPathInput')">
+          <div style="font-size:0.85rem;color:var(--text-dim);margin-bottom:4px;">Drag a folder here</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);">or type the path below</div>
+        </div>
         <input class="form-input" id="destPathInput" type="text" placeholder="e.g. /Users/you/Desktop/Backup">
         <div id="destPathError" style="display:none;font-size:0.75rem;color:var(--red);margin-top:6px;"></div>
         <div class="form-hint">Where to save the copied files on your computer.</div>

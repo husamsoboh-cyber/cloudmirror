@@ -284,6 +284,8 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                     "errors": lines[-50:],
                 }
             )
+        elif self.path == "/api/queue":
+            self._send_json({"queue": self.manager.queue_list()})
         elif self.path == "/api/schedule":
             with self.manager.state_lock:
                 schedule = dict(self.manager.state.get("schedule", {}))
@@ -524,6 +526,22 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                 return
             result = self.manager.set_bandwidth(limit)
             self._send_json(result)
+        elif self.path == "/api/queue/add":
+            body = self._read_body()
+            if body is None:
+                self._send_json({"ok": False, "msg": "Invalid request"}, 400)
+                return
+            self._send_json(self.manager.queue_add(body))
+        elif self.path == "/api/queue/remove":
+            body = self._read_body()
+            if body is None:
+                self._send_json({"ok": False, "msg": "Invalid request"}, 400)
+                return
+            try:
+                idx = int(body.get("index", -1))
+            except (ValueError, TypeError):
+                idx = -1
+            self._send_json(self.manager.queue_remove(idx))
         elif self.path == "/api/history/resume":
             body = self._read_body()
             if body is None:
