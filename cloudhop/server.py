@@ -757,6 +757,7 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
             body = self._read_body()
             if body is not None:
                 source = body.get("source", "")
+                logger.debug("Preview source path: %s", source)
                 if not validate_rclone_input(source, "source"):
                     self._send_json({"ok": False, "msg": "Invalid source"}, 400)
                     return
@@ -821,10 +822,16 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                             if eh > 0:
                                 est_dur += f" {eh} hour{'s' if eh != 1 else ''}"
 
+                        file_count = data.get("count", 0)
+                        logger.info(
+                            "Preview scan: %d files, %s total",
+                            file_count,
+                            size_str,
+                        )
                         self._send_json(
                             {
                                 "ok": True,
-                                "count": data.get("count", 0),
+                                "count": file_count,
                                 "size": size_str,
                                 "size_bytes": size_bytes,
                                 "estimated_duration": est_dur,

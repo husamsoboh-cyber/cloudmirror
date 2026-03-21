@@ -813,14 +813,29 @@ function buildSummary() {
   let srcPath = getSourcePath();
   let dstPath = getDestPath();
 
+  // Show full path for local/icloud sources instead of generic "Local Folder"
+  let srcDisplay = sourceDisplayName;
+  if ((sourceProvider === 'local' || sourceProvider === 'icloud') && srcPath) {
+    srcDisplay = srcPath;
+  } else if (srcSub) {
+    srcDisplay = sourceDisplayName + ' / ' + srcSub;
+  }
+
+  let dstDisplay = destDisplayName;
+  if ((destProvider === 'local' || destProvider === 'icloud') && dstPath) {
+    dstDisplay = dstPath;
+  } else if (dstSub) {
+    dstDisplay = destDisplayName + ' / ' + dstSub;
+  }
+
   card.innerHTML = `
     <div class="summary-row">
       <span class="summary-label">Source</span>
-      <span class="summary-value">${esc(sourceDisplayName)}${srcSub ? ' / ' + esc(srcSub) : ''}</span>
+      <span class="summary-value" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(srcDisplay)}">${esc(srcDisplay)}</span>
     </div>
     <div class="summary-row">
       <span class="summary-label">Destination</span>
-      <span class="summary-value">${esc(destDisplayName)}${dstSub ? ' / ' + esc(dstSub) : ''}</span>
+      <span class="summary-value" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(dstDisplay)}">${esc(dstDisplay)}</span>
     </div>
     <div class="summary-row">
       <span class="summary-label">Speed</span>
