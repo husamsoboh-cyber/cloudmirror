@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from cloudhop.cli import _cli_subcommand, start_dashboard
+from cloudhop.transfer import install_rclone, ensure_rclone, find_rclone
 
 
 def _mock_api_response(data, cookies=""):
@@ -190,3 +191,51 @@ class TestPyWebViewFallback:
             "pywebview failed" in r.message and "cannot init GUI" in r.message
             for r in caplog.records
         )
+
+
+class TestInstallRclone:
+    @patch("cloudhop.transfer.install_rclone")
+    @patch("cloudhop.transfer.find_rclone", return_value="/usr/local/bin/rclone")
+    def test_install_rclone_already_exists(self, mock_find, mock_install):
+        """ensure_rclone returns path without calling install when rclone exists."""
+        result = ensure_rclone()
+        assert result == "/usr/local/bin/rclone"
+        mock_install.assert_not_called()
+
+    @patch("builtins.input", return_value="y")
+    @patch("subprocess.run")
+    @patch("shutil.which")
+    @patch("platform.system", return_value="darwin")
+    @patch("cloudhop.transfer.find_rclone")
+    def test_install_rclone_missing_attempts_download(
+        self, mock_find, mock_platform, mock_which, mock_run, mock_input
+    ):
+        """install_rclone uses brew to install on macOS."""
+        mock_find.side_effect = [None, "/usr/local/bin/rclone"]
+        mock_which.side_effect = lambda cmd: (
+            None if cmd == "rclone" else "/opt/homebrew/bin/brew"
+        )
+        mock_run.return_value = MagicMock(returncode=0)
+
+        install_rclone()
+
+        mock_run.assert_called_once()
+        assert mock_run.call_args[0][0] == ["brew", "install", "rclone"]
+
+    @patch("builtins.input", return_value="y")
+    @patch("subprocess.run")
+    @patch("shutil.which")
+    @patch("platform.system", return_value="darwin")
+    @patch("cloudhop.transfer.find_rclone", return_value=None)
+    def test_install_rclone_download_failure(
+        self, mock_find, mock_platform, mock_which, mock_run, mock_input
+    ):
+        """install_rclone calls sys.exit(1) when brew install fails."""
+        mock_which.side_effect = lambda cmd: (
+            "/opt/homebrew/bin/brew" if cmd == "brew" else None
+        )
+        mock_run.return_value = MagicMock(returncode=1)
+
+        with pytest.raises(SystemExit) as exc_info:
+            install_rclone()
+        assert exc_info.value.code == 1

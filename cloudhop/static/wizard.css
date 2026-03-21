@@ -9,6 +9,12 @@
     --cyan: #22d3ee; --pink: #f472b6; --card-hover: #1c1c22;
     --surface-2: #1c1c22; --border-hover: rgba(255,255,255,0.1);
     --noise-opacity: 0.03;
+    --z-base: 1;
+    --z-dropdown: 50;
+    --z-sticky: 100;
+    --z-toast: 200;
+    --z-modal: 500;
+    --z-overlay: 1000;
   }
   [data-theme="light"] {
     --bg: #f3f4f8; --card: #ffffff; --card-border: rgba(0,0,0,0.06);
@@ -110,6 +116,8 @@
   @media (max-width: 400px) {
     .wizard-card { padding: 20px 16px; }
     .wizard-title { font-size: 1.3rem; }
+    .btn-row { flex-direction: column; gap: 8px; }
+    .btn-row button { width: 100%; }
   }
 
 
@@ -170,6 +178,7 @@
   }
   .btn-row {
     display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 8px;
     margin-top: 24px;
   }
   .btn-row.center { justify-content: center; }
