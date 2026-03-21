@@ -585,6 +585,12 @@ function addCurrentDestToMulti() {
 function removeMultiDest(idx) {
   multiDestinations.splice(idx, 1);
   renderMultiDestList();
+  // F307: Re-evaluate Next button - enable if we still have valid destinations or a current selection
+  const nextBtn = document.getElementById('destNext');
+  if (nextBtn) {
+    nextBtn.disabled = !destProvider && multiDestinations.length === 0;
+  }
+  console.log('[F307] Multi-dest: slot added/removed, valid count:', multiDestinations.length);
 }
 
 function renderMultiDestList() {
@@ -620,7 +626,9 @@ function onAddAnotherDest() {
   document.querySelectorAll('#destGrid .provider-card').forEach(c => c.classList.remove('selected'));
   document.getElementById('destLocalPath').classList.remove('show');
   document.getElementById('destOtherName').classList.remove('show');
-  document.getElementById('destNext').disabled = true;
+  // F307: Keep Next enabled if we already have valid destinations
+  document.getElementById('destNext').disabled = multiDestinations.length === 0;
+  console.log('[F307] Multi-dest: slot added/removed, valid count:', multiDestinations.length);
   destProvider = null;
   destName = '';
   destDisplayName = '';
