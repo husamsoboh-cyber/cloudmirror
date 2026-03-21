@@ -412,6 +412,15 @@ function toggleAdvanced() {
 // Restore wizard state after refresh
 (function() {
   try {
+    // F309: If navigated via "New Transfer", clear all wizard state and start fresh
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new') === '1') {
+      sessionStorage.removeItem('cloudhop_wizard');
+      // Clean up URL without reload
+      window.history.replaceState({}, '', window.location.pathname);
+      console.log('[F309] Wizard state reset for new transfer');
+      return;
+    }
     const saved = sessionStorage.getItem('cloudhop_wizard');
     if (!saved) return;
     const s = JSON.parse(saved);
@@ -456,6 +465,11 @@ function selectSource(card) {
   sourceProvider = card.dataset.provider;
   sourceDisplayName = card.dataset.name;
   sourceName = providerKeys[sourceProvider] || sourceProvider;
+
+  // F301: Clear subfolder when source type changes to prevent stale values
+  const srcSubEl = document.getElementById('sourceSubfolder');
+  if (srcSubEl) { srcSubEl.value = ''; }
+  console.log('[F301] Cleared subfolder on source type change');
 
   document.getElementById('sourceLocalPath').classList.toggle('show', sourceProvider === 'local' || sourceProvider === 'icloud');
   document.getElementById('sourceOtherName').classList.toggle('show', sourceProvider === 'other');
@@ -580,6 +594,12 @@ function addCurrentDestToMulti() {
 function removeMultiDest(idx) {
   multiDestinations.splice(idx, 1);
   renderMultiDestList();
+  // F307: Re-evaluate Next button - enable if we still have valid destinations or a current selection
+  const nextBtn = document.getElementById('destNext');
+  if (nextBtn) {
+    nextBtn.disabled = !destProvider && multiDestinations.length === 0;
+  }
+  console.log('[F307] Multi-dest: slot added/removed, valid count:', multiDestinations.length);
 }
 
 function renderMultiDestList() {
@@ -615,7 +635,9 @@ function onAddAnotherDest() {
   document.querySelectorAll('#destGrid .provider-card').forEach(c => c.classList.remove('selected'));
   document.getElementById('destLocalPath').classList.remove('show');
   document.getElementById('destOtherName').classList.remove('show');
-  document.getElementById('destNext').disabled = true;
+  // F307: Keep Next enabled if we already have valid destinations
+  document.getElementById('destNext').disabled = multiDestinations.length === 0;
+  console.log('[F307] Multi-dest: slot added/removed, valid count:', multiDestinations.length);
   destProvider = null;
   destName = '';
   destDisplayName = '';
