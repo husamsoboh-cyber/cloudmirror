@@ -1151,11 +1151,13 @@ class TestCrashBackoff:
 
 class TestTransferQueue:
     def test_queue_add(self, manager):
-        """queue_add adds an entry."""
+        """queue_add adds an entry with queue_id."""
         result = manager.queue_add({"source": "gdrive:", "dest": "onedrive:"})
         assert result["ok"] is True
-        assert result["position"] == 1
+        assert "queue_id" in result
         assert len(manager.queue) == 1
+        assert manager.queue[0]["status"] == "waiting"
+        assert "added_at" in manager.queue[0]
 
     def test_queue_add_missing_source(self, manager):
         """queue_add rejects missing source."""
@@ -1173,21 +1175,19 @@ class TestTransferQueue:
         manager.queue_add({"source": "c:", "dest": "d:"})
         items = manager.queue_list()
         assert len(items) == 2
-        assert items[0]["source"] == "a:"
+        assert items[0]["config"]["source"] == "a:"
 
     def test_queue_remove(self, manager):
-        """queue_remove removes by index."""
-        manager.queue_add({"source": "a:", "dest": "b:"})
+        """queue_remove removes by queue_id."""
+        r1 = manager.queue_add({"source": "a:", "dest": "b:"})
         manager.queue_add({"source": "c:", "dest": "d:"})
-        result = manager.queue_remove(0)
-        assert result["ok"] is True
+        assert manager.queue_remove(r1["queue_id"]) is True
         assert len(manager.queue) == 1
-        assert manager.queue[0]["source"] == "c:"
+        assert manager.queue[0]["config"]["source"] == "c:"
 
-    def test_queue_remove_invalid_index(self, manager):
-        """queue_remove rejects invalid index."""
-        result = manager.queue_remove(99)
-        assert result["ok"] is False
+    def test_queue_remove_nonexistent(self, manager):
+        """queue_remove returns False for unknown queue_id."""
+        assert manager.queue_remove("nonexistent") is False
 
     def test_queue_persists_to_disk(self, manager):
         """Queue is saved and loaded from disk."""
@@ -1195,13 +1195,24 @@ class TestTransferQueue:
         # Reload
         manager._load_queue()
         assert len(manager.queue) == 1
-        assert manager.queue[0]["source"] == "a:"
+        assert manager.queue[0]["config"]["source"] == "a:"
+
+    def test_queue_reorder(self, manager):
+        """queue_reorder moves an item to a new position."""
+        r1 = manager.queue_add({"source": "a:", "dest": "b:"})
+        r2 = manager.queue_add({"source": "c:", "dest": "d:"})
+        r3 = manager.queue_add({"source": "e:", "dest": "f:"})
+        # Move third item to position 0
+        assert manager.queue_reorder(r3["queue_id"], 0) is True
+        assert manager.queue[0]["queue_id"] == r3["queue_id"]
+        assert manager.queue[1]["queue_id"] == r1["queue_id"]
+        assert manager.queue[2]["queue_id"] == r2["queue_id"]
 
     def test_queue_process_marks_completed(self, manager):
-        """queue_process_next marks running items as completed."""
+        """queue_process_next marks active items as completed."""
         manager.queue = [
-            {"source": "a:", "dest": "b:", "status": "running"},
-            {"source": "c:", "dest": "d:", "status": "queued"},
+            {"queue_id": "aaa", "status": "active", "config": {"source": "a:", "dest": "b:"}},
+            {"queue_id": "bbb", "status": "waiting", "config": {"source": "c:", "dest": "d:"}},
         ]
         # Process should mark first as completed, try to start second
         manager.queue_process_next()
@@ -1224,23 +1235,27 @@ class TestQueueProcessing:
     @patch("subprocess.Popen")
     @patch("os.path.exists", return_value=True)
     def test_queue_process_next_starts_transfer(self, mock_exists, mock_popen, manager):
-        """queue_process_next starts the next queued transfer."""
+        """queue_process_next starts the next waiting transfer."""
         mock_proc = MagicMock()
         mock_proc.pid = 8888
         mock_popen.return_value = mock_proc
 
         manager.queue = [
             {
-                "source": "/tmp/a",
-                "dest": "/tmp/b",
-                "source_type": "local",
-                "dest_type": "local",
-                "status": "queued",
+                "queue_id": "test123456789abc",
+                "status": "waiting",
+                "added_at": "2025-01-01T00:00:00",
+                "config": {
+                    "source": "/tmp/a",
+                    "dest": "/tmp/b",
+                    "source_type": "local",
+                    "dest_type": "local",
+                },
             }
         ]
         result = manager.queue_process_next()
         assert result["ok"] is True
-        assert manager.queue[0]["status"] == "running"
+        assert manager.queue[0]["status"] == "active"
 
     def test_background_scanner_is_daemon(self, manager):
         """background_scanner thread can be set as daemon."""

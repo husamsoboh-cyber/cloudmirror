@@ -920,17 +920,11 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
             if body is None:
                 self._send_json({"ok": False, "msg": "Invalid request"}, 400)
                 return
+            logger.info("Queue API: add transfer")
             self._send_json(self.manager.queue_add(body))
-        elif self.path == "/api/queue/remove":
-            body = self._read_body()
-            if body is None:
-                self._send_json({"ok": False, "msg": "Invalid request"}, 400)
-                return
-            try:
-                idx = int(body.get("index", -1))
-            except (ValueError, TypeError):
-                idx = -1
-            self._send_json(self.manager.queue_remove(idx))
+        elif self.path == "/api/queue/start-next":
+            logger.info("Queue API: start next")
+            self._send_json(self.manager.queue_process_next())
         elif self.path == "/api/history/resume":
             body = self._read_body()
             if body is None:
@@ -978,6 +972,60 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
         else:
             self._send_404()
 
+    # ── DELETE routes ────────────────────────────────────────────────────
+
+    def do_DELETE(self) -> None:
+        if not self._check_host():
+            return
+        if self.manager is None:
+            self._send_json({"ok": False, "msg": "Server not ready"}, 503)
+            return
+        if not self._check_csrf():
+            return
+
+        # DELETE /api/queue/<queue_id>
+        m = re.match(r"^/api/queue/([0-9a-f]{16})$", self.path)
+        if m:
+            queue_id = m.group(1)
+            logger.info("Queue API: remove %s", queue_id)
+            if self.manager.queue_remove(queue_id):
+                self._send_json({"ok": True})
+            else:
+                self._send_json({"ok": False, "msg": "Queue item not found or is active"}, 400)
+        else:
+            self._send_404()
+
+    # ── PUT routes ────────────────────────────────────────────────────────
+
+    def do_PUT(self) -> None:
+        if not self._check_host():
+            return
+        if self.manager is None:
+            self._send_json({"ok": False, "msg": "Server not ready"}, 503)
+            return
+        if not self._check_csrf():
+            return
+
+        # PUT /api/queue/<queue_id>/reorder
+        m = re.match(r"^/api/queue/([0-9a-f]{16})/reorder$", self.path)
+        if m:
+            queue_id = m.group(1)
+            body = self._read_body()
+            if body is None:
+                self._send_json({"ok": False, "msg": "Invalid request"}, 400)
+                return
+            try:
+                position = int(body.get("position", -1))
+            except (ValueError, TypeError):
+                position = -1
+            logger.info("Queue API: reorder %s to position %d", queue_id, position)
+            if self.manager.queue_reorder(queue_id, position):
+                self._send_json({"ok": True})
+            else:
+                self._send_json({"ok": False, "msg": "Invalid queue_id or position"}, 400)
+        else:
+            self._send_404()
+
     # ── OPTIONS (CORS preflight) ─────────────────────────────────────────
 
     def do_OPTIONS(self) -> None:
@@ -989,7 +1037,7 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
         allowed_origins = {f"http://localhost:{port}", f"http://127.0.0.1:{port}"}
         if origin in allowed_origins:
             self.send_header("Access-Control-Allow-Origin", origin)
-            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token")
         self.end_headers()
 

@@ -1520,7 +1520,9 @@ if (_isDemo) {
 }
 
 refresh();
+refreshQueue();
 ensurePolling(_isDemo ? 2000 : 5000);
+setInterval(refreshQueue, _isDemo ? 5000 : 5000);
 window.addEventListener('resize', () => {
   if (drawAreaChart._cache) drawAreaChart._cache = {};
   drawAreaChart('speedChart', speedHistory, '#6366f1', 'speedGrad', fmtSpeedShort, true);
@@ -1561,3 +1563,98 @@ window.addEventListener('resize', () => {
   }).catch(() => {});
   setTimeout(checkForUpdates, 1800000);
 })();
+
+// ========== TRANSFER QUEUE ==========
+
+async function refreshQueue() {
+  try {
+    const res = await fetch('/api/queue');
+    if (!res.ok) return;
+    const data = await res.json();
+    const items = data.queue || [];
+    const section = document.getElementById('queueSection');
+    const list = document.getElementById('queueList');
+    const empty = document.getElementById('queueEmpty');
+    const btnStart = document.getElementById('btnStartNext');
+    if (!section || !list) return;
+
+    // Filter to show only waiting/active/failed (hide completed)
+    const visible = items.filter(i => i.status !== 'completed');
+    if (visible.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = '';
+    const hasWaiting = visible.some(i => i.status === 'waiting');
+    const hasActive = visible.some(i => i.status === 'active');
+    if (btnStart) btnStart.style.display = (hasWaiting && !hasActive) ? '' : 'none';
+
+    if (visible.length === 0) {
+      list.innerHTML = '';
+      if (empty) empty.style.display = '';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+
+    let html = '';
+    visible.forEach((item, idx) => {
+      const cfg = item.config || {};
+      const src = esc(cfg.source || '?');
+      const dst = esc(cfg.dest || '?');
+      const status = item.status || 'waiting';
+      const addedAt = item.added_at ? new Date(item.added_at).toLocaleTimeString() : '';
+      const qid = item.queue_id || '';
+      const canRemove = status === 'waiting' || status === 'failed';
+      const canMoveUp = status === 'waiting' && idx > 0 && visible[idx - 1].status === 'waiting';
+      const canMoveDown = status === 'waiting' && idx < visible.length - 1 && visible[idx + 1].status === 'waiting';
+
+      html += '<div class="queue-item" data-qid="' + esc(qid) + '">';
+      html += '<div class="queue-item-info">';
+      html += '<span class="queue-badge ' + status + '">' + esc(status) + '</span>';
+      html += '<span class="queue-item-path">' + src + ' &rarr; ' + dst + '</span>';
+      if (addedAt) html += '<span class="queue-item-time">' + esc(addedAt) + '</span>';
+      html += '</div>';
+      html += '<div class="queue-item-actions">';
+      if (canMoveUp) html += '<button class="queue-btn" onclick="queueMove(\'' + esc(qid) + '\',' + (idx - 1) + ')" title="Move up">&uarr;</button>';
+      if (canMoveDown) html += '<button class="queue-btn" onclick="queueMove(\'' + esc(qid) + '\',' + (idx + 1) + ')" title="Move down">&darr;</button>';
+      if (canRemove) html += '<button class="queue-btn remove" onclick="queueRemove(\'' + esc(qid) + '\')" title="Remove">&times;</button>';
+      html += '</div></div>';
+    });
+    list.innerHTML = html;
+  } catch (e) {
+    console.error('Queue refresh error:', e);
+  }
+}
+
+async function queueRemove(queueId) {
+  try {
+    await fetch('/api/queue/' + queueId, {
+      method: 'DELETE',
+      headers: { 'X-CSRF-Token': getCsrfToken(), 'Content-Type': 'application/json' }
+    });
+    refreshQueue();
+  } catch (e) { console.error('Queue remove error:', e); }
+}
+
+async function queueMove(queueId, position) {
+  try {
+    await fetch('/api/queue/' + queueId + '/reorder', {
+      method: 'PUT',
+      headers: { 'X-CSRF-Token': getCsrfToken(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ position: position })
+    });
+    refreshQueue();
+  } catch (e) { console.error('Queue reorder error:', e); }
+}
+
+async function queueStartNext() {
+  try {
+    await fetch('/api/queue/start-next', {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': getCsrfToken(), 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    refreshQueue();
+    refresh();
+  } catch (e) { console.error('Queue start-next error:', e); }
+}

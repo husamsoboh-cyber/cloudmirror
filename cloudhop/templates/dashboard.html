@@ -132,6 +132,16 @@
   </button>
 </div>
 
+<!-- ========== TRANSFER QUEUE ========== -->
+<div id="queueSection" class="card" style="display:none;margin-bottom:var(--section-gap);padding:20px 24px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+    <div style="font-size:0.95rem;font-weight:700;color:var(--text-primary);">Transfer Queue</div>
+    <button id="btnStartNext" onclick="queueStartNext()" style="display:none;padding:6px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff;cursor:pointer;font-size:0.8rem;font-weight:600;">Start Next</button>
+  </div>
+  <div id="queueList"></div>
+  <div id="queueEmpty" style="display:none;text-align:center;padding:16px 0;color:var(--text-secondary);font-size:0.85rem;">No transfers queued. Start a new transfer from the wizard.</div>
+</div>
+
 <!-- ========== STATS GRID ========== -->
 <div class="stats-grid" id="statsGrid">
   <div class="stat-card card">

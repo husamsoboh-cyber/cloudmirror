@@ -79,6 +79,38 @@ def _post(
     return req
 
 
+def _delete(
+    port: int,
+    path: str,
+    csrf: Optional[str] = CSRF_TOKEN,
+    host: str = "localhost",
+) -> urllib.request.Request:
+    """Build a DELETE request with CSRF token."""
+    req = urllib.request.Request(f"http://127.0.0.1:{port}{path}", method="DELETE")
+    req.add_header("Host", f"{host}:{port}")
+    req.add_header("Content-Type", "application/json")
+    if csrf:
+        req.add_header("X-CSRF-Token", csrf)
+    return req
+
+
+def _put(
+    port: int,
+    path: str,
+    body: Optional[Dict[str, Any]] = None,
+    csrf: Optional[str] = CSRF_TOKEN,
+    host: str = "localhost",
+) -> urllib.request.Request:
+    """Build a PUT request with CSRF token and JSON body."""
+    data = json.dumps(body or {}).encode()
+    req = urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=data, method="PUT")
+    req.add_header("Host", f"{host}:{port}")
+    req.add_header("Content-Type", "application/json")
+    if csrf:
+        req.add_header("X-CSRF-Token", csrf)
+    return req
+
+
 def _fetch(req: urllib.request.Request, timeout: int = 5) -> Dict[str, Any]:
     """Execute request and return parsed JSON (retries once on connection reset).
 
@@ -222,16 +254,18 @@ class TestPostRoutesValid:
         # Add
         data = _fetch(_post(port, "/api/queue/add", {"source": "gdrive:", "dest": "onedrive:"}))
         assert data["ok"] is True
-        assert data["position"] == 1
+        assert "queue_id" in data
         # List
         data = _fetch(_get(port, "/api/queue"))
         assert len(data["queue"]) == 1
-        assert data["queue"][0]["source"] == "gdrive:"
+        assert data["queue"][0]["config"]["source"] == "gdrive:"
 
     def test_queue_remove(self, server_fixture):
         port = server_fixture["port"]
-        _fetch(_post(port, "/api/queue/add", {"source": "a:", "dest": "b:"}))
-        data = _fetch(_post(port, "/api/queue/remove", {"index": 0}))
+        add_data = _fetch(_post(port, "/api/queue/add", {"source": "a:", "dest": "b:"}))
+        queue_id = add_data["queue_id"]
+        req = _delete(port, f"/api/queue/{queue_id}")
+        data = _fetch(req)
         assert data["ok"] is True
 
     def test_schedule_post(self, server_fixture):
@@ -283,9 +317,10 @@ class TestPostRoutesInvalid:
         )
         assert data["ok"] is False
 
-    def test_queue_remove_invalid_index(self, server_fixture):
+    def test_queue_remove_invalid_id(self, server_fixture):
         port = server_fixture["port"]
-        data = _fetch(_post(port, "/api/queue/remove", {"index": 999}))
+        status, body = _fetch_raw(_delete(port, "/api/queue/0000000000000000"))
+        data = json.loads(body)
         assert data["ok"] is False
 
     def test_schedule_invalid_time(self, server_fixture):
