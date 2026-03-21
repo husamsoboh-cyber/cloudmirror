@@ -457,6 +457,11 @@ function selectSource(card) {
   sourceDisplayName = card.dataset.name;
   sourceName = providerKeys[sourceProvider] || sourceProvider;
 
+  // F301: Clear subfolder when source type changes to prevent stale values
+  const srcSubEl = document.getElementById('sourceSubfolder');
+  if (srcSubEl) { srcSubEl.value = ''; }
+  console.log('[F301] Cleared subfolder on source type change');
+
   document.getElementById('sourceLocalPath').classList.toggle('show', sourceProvider === 'local' || sourceProvider === 'icloud');
   document.getElementById('sourceOtherName').classList.toggle('show', sourceProvider === 'other');
   if (sourceProvider === 'icloud') {
