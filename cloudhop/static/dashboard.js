@@ -612,6 +612,15 @@ async function refresh() {
     document.getElementById('sessionBadge').textContent = `Session ${d.session_num || 1}`;
     if (d.transfer_label) document.getElementById('transferTitle').textContent = d.transfer_label;
 
+    // Initialize bandwidth dropdown from current transfer state
+    if (d.bw_limit) {
+      const bwSel = document.getElementById('bwLimit');
+      if (bwSel && !bwSel._initialized) {
+        bwSel.value = d.bw_limit;
+        bwSel._initialized = true;
+      }
+    }
+
     if (d.speed_history && d.speed_history.length > 0) {
       speedHistory = d.speed_history;
     }
@@ -965,23 +974,67 @@ async function refresh() {
 function showToast(msg, color) {
   const t = document.getElementById('toast');
   t.textContent = msg;
+  const dismiss = document.createElement('span');
+  dismiss.textContent = '\u00d7';
+  dismiss.style.cssText = 'margin-left:12px;cursor:pointer;font-size:1.1rem;font-weight:700;opacity:0.7;';
+  dismiss.onclick = () => t.classList.remove('show');
+  t.appendChild(dismiss);
   t.style.borderColor = color || 'var(--primary)';
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
+  const isError = color && (color.includes('red') || color.includes('orange'));
+  if (showToast._timer) clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => t.classList.remove('show'), isError ? 7000 : 4000);
 }
 
 async function cancelTransfer() {
-  if (!await showConfirmModal('Stop the transfer and start a new one?')) return;
-  try {
-    const res = await fetch('/api/pause', {method:'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken()}});
-    if (res.ok) {
-      window.location.href = '/wizard';
-    } else {
-      showToast('Failed to cancel transfer.', 'var(--red)');
+  return new Promise((resolve) => {
+    if (document.getElementById('_cm_cancel_overlay')) return resolve();
+    const overlay = document.createElement('div');
+    overlay.id = '_cm_cancel_overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;';
+    overlay.innerHTML = `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:28px 32px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+      <p style="margin:0 0 20px;font-size:0.95rem;color:var(--text-primary);">Are you sure you want to cancel this transfer?</p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button id="_cm_dismiss" style="padding:8px 18px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);cursor:pointer;">Keep Running</button>
+        <button id="_cm_cancel_stay" style="padding:8px 18px;border-radius:8px;border:1px solid var(--red);background:rgba(239,68,68,0.1);color:var(--red);cursor:pointer;font-weight:600;">Cancel Transfer</button>
+        <button id="_cm_cancel_new" style="padding:8px 18px;border-radius:8px;border:none;background:var(--primary);color:#fff;cursor:pointer;font-weight:600;">Start New</button>
+      </div></div>`;
+    document.body.appendChild(overlay);
+    function cleanup() { overlay.remove(); document.removeEventListener('keydown', escHandler); }
+    function escHandler(e) { if (e.key === 'Escape') { cleanup(); resolve(); } }
+    document.addEventListener('keydown', escHandler);
+    overlay.querySelector('#_cm_dismiss').onclick = () => { cleanup(); resolve(); };
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) { cleanup(); resolve(); } });
+    async function doCancel(goToWizard) {
+      cleanup();
+      try {
+        const res = await fetch('/api/pause', {method:'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken()}});
+        if (res.ok) {
+          // Immediately clear active transfers display
+          const list = document.getElementById('transfersList');
+          if (list) list.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:0.8rem;">No active transfers</div>';
+          document.getElementById('transferCount').textContent = '0 active';
+          updateStatusDot('stopped');
+          setText('statusText', 'Cancelled');
+          updateButtons(false);
+          if (goToWizard) {
+            window.location.href = '/wizard';
+          } else {
+            setTimeout(refresh, 2000);
+          }
+        } else {
+          showToast('Failed to cancel transfer.', 'var(--red)');
+        }
+      } catch(e) {
+        showToast('Error: ' + e.message, 'var(--red)');
+      }
+      resolve();
     }
-  } catch(e) {
-    showToast('Error: ' + e.message, 'var(--red)');
-  }
+    overlay.querySelector('#_cm_cancel_stay').onclick = () => doCancel(false);
+    overlay.querySelector('#_cm_cancel_new').onclick = () => doCancel(true);
+  });
 }
 
 async function doAction(action) {

@@ -643,6 +643,32 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                 return
             name = body.get("name", "")
             self._send_json({"configured": remote_exists(name)})
+        elif self.path == "/api/wizard/validate-path":
+            body = self._read_body()
+            if body is None:
+                self._send_json({"ok": False, "msg": "Invalid request"}, 400)
+                return
+            path = body.get("path", "")
+            if not path:
+                self._send_json({"exists": False, "is_directory": False})
+                return
+            if not validate_rclone_input(path, "path"):
+                self._send_json({"ok": False, "msg": "Invalid path"}, 400)
+                return
+            # Restrict local paths to home directory
+            home = os.path.expanduser("~")
+            real_path = os.path.realpath(os.path.expandvars(path))
+            if not real_path.startswith(home + os.sep) and real_path != home:
+                logger.info("Validate-path blocked: path %s is outside home directory", path)
+                self._send_json(
+                    {"ok": False, "msg": "Path validation is restricted to home directory"},
+                    403,
+                )
+                return
+            exists = os.path.exists(real_path)
+            is_dir = os.path.isdir(real_path) if exists else False
+            logger.info("Path validated: %s (exists=%s, is_dir=%s)", path, exists, is_dir)
+            self._send_json({"exists": exists, "is_directory": is_dir})
         elif self.path == "/api/wizard/browse":
             body = self._read_body()
             if body is None:

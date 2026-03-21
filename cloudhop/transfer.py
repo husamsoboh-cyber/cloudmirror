@@ -1415,6 +1415,15 @@ class TransferManager:
 
         result["rclone_running"] = self.is_rclone_running()
 
+        # Extract current bandwidth limit from rclone command for dashboard
+        with self.state_lock:
+            for arg in self.rclone_cmd:
+                if arg.startswith("--bwlimit="):
+                    bw_val = arg.split("=", 1)[1]
+                    # Convert to dashboard dropdown format (e.g. "10M" -> "10M")
+                    result["bw_limit"] = bw_val
+                    break
+
         # Grace period: avoid false "Stopped" status while rclone RC is booting
         just_started = (
             self._transfer_start_time is not None and (time.time() - self._transfer_start_time) < 10
@@ -1516,6 +1525,22 @@ class TransferManager:
                 self._rclone_proc = proc
                 self.rclone_pid = proc.pid
                 self.transfer_active = True
+                # Increment session counter on resume
+                sessions = self.state.get("sessions", [])
+                new_session_num = len(sessions) + 1
+                sessions.append(
+                    {
+                        "session_num": new_session_num,
+                        "num": new_session_num,
+                        "start": datetime.now().strftime("%Y/%m/%d %H:%M:%S"),
+                        "elapsed_sec": 0,
+                        "transferred": 0,
+                        "files": 0,
+                    }
+                )
+                self.state["sessions"] = sessions
+                logger.info("Session counter incremented to %d on resume", new_session_num)
+            self.save_state()
             self._transfer_start_time = time.time()
             logger.info("Transfer resumed (PID %s), marked just_started", proc.pid)
             return {"ok": True, "msg": f"Started rclone (PID {proc.pid})"}

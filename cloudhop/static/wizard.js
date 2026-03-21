@@ -227,8 +227,13 @@ function showStepError(msg) {
   d.id = '_stepError';
   d.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);padding:10px 20px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:10px;font-size:0.85rem;color:var(--red);z-index:300;text-align:center;';
   d.textContent = msg;
+  const dismiss = document.createElement('span');
+  dismiss.textContent = '\u00d7';
+  dismiss.style.cssText = 'margin-left:12px;cursor:pointer;font-size:1.1rem;font-weight:700;opacity:0.7;';
+  dismiss.onclick = () => d.remove();
+  d.appendChild(dismiss);
   document.body.appendChild(d);
-  setTimeout(() => { if (d.parentNode) d.remove(); }, 3000);
+  setTimeout(() => { if (d.parentNode) d.remove(); }, 7000);
 }
 
 // Navigation
@@ -240,6 +245,34 @@ async function goTo(step) {
   if (step >= 4 && !destProvider) {
     showStepError('Please select a destination provider to continue');
     return;
+  }
+  // Validate local source path early (Bug 3)
+  if (step === 3 && (sourceProvider === 'local' || sourceProvider === 'icloud')) {
+    const pathInput = document.getElementById('sourcePathInput');
+    const path = pathInput ? pathInput.value.trim() : '';
+    if (path) {
+      try {
+        const vResp = await fetch('/api/wizard/validate-path', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken()},
+          body: JSON.stringify({path: path})
+        });
+        const vData = await vResp.json();
+        if (!vData.exists) {
+          const errEl = document.getElementById('sourcePathError');
+          if (errEl) { errEl.textContent = 'This path does not exist. Please check and try again.'; errEl.style.display = 'block'; }
+          return;
+        }
+        if (!vData.is_directory) {
+          const errEl = document.getElementById('sourcePathError');
+          if (errEl) { errEl.textContent = 'This path is not a directory. Please select a folder.'; errEl.style.display = 'block'; }
+          return;
+        }
+        document.getElementById('sourcePathError').style.display = 'none';
+      } catch(e) {
+        // If validation endpoint unavailable, let it proceed
+      }
+    }
   }
   if (step === 3) updateDestGrid();
   if (step === 5) buildConnectStep();
@@ -902,6 +935,17 @@ async function startTransfer() {
   const excludeList = excludes ? excludes.split(',').map(e => e.trim()).filter(Boolean) : [];
 
   try {
+    // Warn if destination subfolder is empty (files go to cloud root)
+    const destSub = document.getElementById('destSubfolder').value.trim();
+    if (!destSub && destProvider !== 'local' && destProvider !== 'icloud') {
+      const proceed = await showConfirmModal('No subfolder specified. Files will be copied to the root of your cloud drive. Continue?');
+      if (!proceed) {
+        startTransfer._running = false;
+        btn.disabled = false;
+        btn.textContent = 'Start Transfer';
+        return;
+      }
+    }
     const src = getSourcePath();
     const dst = getDestPath();
     if (!src || !dst) {
