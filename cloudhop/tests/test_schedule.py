@@ -178,3 +178,59 @@ class TestCheckScheduleTransitions:
                 mgr._check_schedule()  # Third call - no transition
                 # resume should be called at most once (on first transition)
                 assert mock_resume.call_count <= 1
+
+
+# ===========================================================================
+# Battery Check
+# ===========================================================================
+
+
+class TestBatteryCheck:
+    def test_ac_power_no_pause(self, tmp_path):
+        """On AC power, transfer should not be paused."""
+        mgr = TransferManager(cm_dir=str(tmp_path))
+        mgr.state["pause_on_battery"] = True
+        with patch.object(mgr, "_is_on_battery", return_value=False):
+            with patch.object(mgr, "is_rclone_running", return_value=True):
+                with patch.object(mgr, "pause") as mock_pause:
+                    mgr._check_battery()
+                    mock_pause.assert_not_called()
+
+    def test_battery_below_threshold_pauses(self, tmp_path):
+        """On battery power, running transfer should be paused."""
+        mgr = TransferManager(cm_dir=str(tmp_path))
+        mgr.state["pause_on_battery"] = True
+        with patch.object(mgr, "_is_on_battery", return_value=True):
+            with patch.object(mgr, "is_rclone_running", return_value=True):
+                with patch.object(mgr, "pause") as mock_pause:
+                    mgr._check_battery()
+                    mock_pause.assert_called_once()
+        assert mgr.state.get("_battery_paused") is True
+
+    def test_recovery_battery_to_ac_resumes(self, tmp_path):
+        """When power goes from battery to AC, previously paused transfer resumes."""
+        mgr = TransferManager(cm_dir=str(tmp_path))
+        mgr.state["pause_on_battery"] = True
+        mgr.state["_battery_paused"] = True
+        mgr.rclone_cmd = ["rclone", "copy", "a:", "b:"]
+        with patch.object(mgr, "_is_on_battery", return_value=False):
+            with patch.object(mgr, "is_rclone_running", return_value=False):
+                with patch.object(mgr, "is_in_schedule_window", return_value=True):
+                    with patch.object(mgr, "resume") as mock_resume:
+                        mgr._check_battery()
+                        mock_resume.assert_called_once()
+        assert mgr.state.get("_battery_paused") is False
+
+    def test_no_battery_info_skips(self, tmp_path):
+        """When pause_on_battery is False, _check_battery is a no-op."""
+        mgr = TransferManager(cm_dir=str(tmp_path))
+        mgr.state["pause_on_battery"] = False
+        with patch.object(mgr, "_is_on_battery") as mock_battery:
+            mgr._check_battery()
+            mock_battery.assert_not_called()
+
+    @patch("platform.system", return_value="Linux")
+    def test_non_darwin_not_on_battery(self, mock_system, tmp_path):
+        """On non-Darwin platforms, _is_on_battery returns False."""
+        mgr = TransferManager(cm_dir=str(tmp_path))
+        assert mgr._is_on_battery() is False

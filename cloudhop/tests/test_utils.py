@@ -13,6 +13,10 @@ from cloudhop.utils import (
     RE_SPEED,
     RE_TRANSFERRED_BYTES,
     RE_TRANSFERRED_FILES,
+    RE_ACTIVE,
+    RE_COPIED,
+    RE_COPIED_WITH_TS,
+    RE_ERROR_MSG,
     _sanitize_rclone_error,
     downsample,
     fmt_bytes,
@@ -537,3 +541,65 @@ class TestFmtBytesEdgeCases:
         """Negative byte values should not crash."""
         result = fmt_bytes(-1)
         assert "B" in result
+
+
+# ─── Unicode Log Parsing ────────────────────────────────────────────────────
+
+
+class TestUnicodeLogParsing:
+    def test_unicode_filename_copied(self):
+        """RE_COPIED matches Japanese Unicode filenames."""
+        line = "INFO  : \u4f8b\u3048\u3070.txt: Copied (new)"
+        m = RE_COPIED.search(line)
+        assert m is not None
+        assert m.group(1) == "\u4f8b\u3048\u3070.txt"
+
+    def test_arabic_filename_copied(self):
+        """RE_COPIED matches Arabic Unicode filenames."""
+        line = "INFO  : \u0645\u0633\u062a\u0646\u062f.pdf: Copied (new)"
+        m = RE_COPIED.search(line)
+        assert m is not None
+        assert m.group(1) == "\u0645\u0633\u062a\u0646\u062f.pdf"
+
+    def test_unicode_path_with_timestamp(self):
+        """RE_COPIED_WITH_TS matches Unicode filenames with timestamps."""
+        line = "2024/01/15 13:01:22 INFO  : \u4f8b\u3048\u3070/\u30c6\u30b9\u30c8.txt: Copied (new)"
+        m = RE_COPIED_WITH_TS.search(line)
+        assert m is not None
+        assert m.group(1) == "2024/01/15 13:01:22"
+        assert "\u4f8b\u3048\u3070" in m.group(2)
+
+    def test_error_with_special_chars(self):
+        """RE_ERROR_MSG matches error lines with special characters."""
+        line = "13:01:22 ERROR : \u00e9\u00e8\u00ea file\u2019s: connection failed"
+        m = RE_ERROR_MSG.search(line)
+        assert m is not None
+        assert "\u00e9\u00e8\u00ea" in m.group(1)
+
+    def test_mixed_ascii_unicode_filename(self):
+        """RE_COPIED handles mixed ASCII and Unicode characters."""
+        line = "INFO  : photos/vacation_\u65c5\u884c_2024.jpg: Copied (new)"
+        m = RE_COPIED.search(line)
+        assert m is not None
+        assert "vacation_\u65c5\u884c_2024.jpg" in m.group(1)
+
+    def test_emoji_in_filename(self):
+        """RE_COPIED matches filenames with emoji characters."""
+        line = "INFO  : \U0001f4c1documents/\U0001f3b5music.mp3: Copied (new)"
+        m = RE_COPIED.search(line)
+        assert m is not None
+        assert "\U0001f4c1" in m.group(1)
+
+    def test_active_transfer_unicode(self):
+        """RE_ACTIVE matches active transfer with Unicode filename."""
+        line = "*  \u6587\u66f8.zip:  45% /500MiB, 30MiB/s, 10s"
+        m = RE_ACTIVE.search(line)
+        assert m is not None
+        assert m.group(1) == "\u6587\u66f8.zip"
+
+    def test_transferred_bytes_with_unicode_context(self):
+        """RE_TRANSFERRED_BYTES works in presence of surrounding Unicode."""
+        line = "Transferred:   90.054 GiB / 120.000 GiB, 75%, 10.5 MiB/s"
+        m = RE_TRANSFERRED_BYTES.search(line)
+        assert m is not None
+        assert m.group(1) == "90.054 GiB"

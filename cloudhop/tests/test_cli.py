@@ -211,10 +211,8 @@ class TestInstallRclone:
         self, mock_find, mock_platform, mock_which, mock_run, mock_input
     ):
         """install_rclone uses brew to install on macOS."""
-        mock_find.side_effect = [None, "/usr/local/bin/rclone"]
-        mock_which.side_effect = lambda cmd: (
-            None if cmd == "rclone" else "/opt/homebrew/bin/brew"
-        )
+        mock_find.return_value = "/usr/local/bin/rclone"
+        mock_which.side_effect = lambda cmd: None if cmd == "rclone" else "/opt/homebrew/bin/brew"
         mock_run.return_value = MagicMock(returncode=0)
 
         install_rclone()
@@ -231,9 +229,7 @@ class TestInstallRclone:
         self, mock_find, mock_platform, mock_which, mock_run, mock_input
     ):
         """install_rclone calls sys.exit(1) when brew install fails."""
-        mock_which.side_effect = lambda cmd: (
-            "/opt/homebrew/bin/brew" if cmd == "brew" else None
-        )
+        mock_which.side_effect = lambda cmd: "/opt/homebrew/bin/brew" if cmd == "brew" else None
         mock_run.return_value = MagicMock(returncode=1)
 
         with pytest.raises(SystemExit) as exc_info:

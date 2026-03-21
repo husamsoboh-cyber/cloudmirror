@@ -205,5 +205,80 @@ class TestCheckCsrf(unittest.TestCase):
         self.assertFalse(result)
 
 
+class TestSymlinkSecurity(unittest.TestCase):
+    """Test that _serve_static handles symlinks securely."""
+
+    def test_normal_file_served(self):
+        """A regular file in the static dir is served normally."""
+        handler = _make_handler()
+        static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+        if os.path.isdir(static_dir):
+            files = [
+                f for f in os.listdir(static_dir) if os.path.isfile(os.path.join(static_dir, f))
+            ]
+            if files:
+                handler._serve_static(files[0])
+                handler.send_response.assert_called_with(200)
+
+    def test_symlink_outside_static_rejected(self, tmp_path=None):
+        """Symlink pointing outside static dir must be rejected."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a file outside the static dir
+            outside_file = os.path.join(tmpdir, "secret.txt")
+            with open(outside_file, "w") as f:
+                f.write("secret data")
+
+            static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+            if not os.path.isdir(static_dir):
+                self.skipTest("static dir not found")
+
+            link_name = os.path.join(static_dir, "_test_symlink_outside.css")
+            try:
+                os.symlink(outside_file, link_name)
+                handler = _make_handler()
+                handler._serve_static("_test_symlink_outside.css")
+                # Should return 403 because realpath resolves outside static dir
+                calls = [c[0][0] for c in handler.send_response.call_args_list]
+                self.assertIn(403, calls)
+            except OSError:
+                self.skipTest("Cannot create symlinks")
+            finally:
+                if os.path.islink(link_name):
+                    os.unlink(link_name)
+
+    def test_symlink_within_static_served(self):
+        """Symlink pointing to another file within static dir is allowed."""
+        static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+        if not os.path.isdir(static_dir):
+            self.skipTest("static dir not found")
+
+        files = [f for f in os.listdir(static_dir) if os.path.isfile(os.path.join(static_dir, f))]
+        if not files:
+            self.skipTest("No files in static dir")
+
+        link_name = os.path.join(static_dir, "_test_symlink_internal.css")
+        target = os.path.join(static_dir, files[0])
+        try:
+            os.symlink(target, link_name)
+            handler = _make_handler()
+            handler._serve_static("_test_symlink_internal.css")
+            handler.send_response.assert_called_with(200)
+        except OSError:
+            self.skipTest("Cannot create symlinks")
+        finally:
+            if os.path.islink(link_name):
+                os.unlink(link_name)
+
+    def test_directory_traversal_via_symlink(self):
+        """Directory traversal attempt via path components is rejected."""
+        handler = _make_handler()
+        handler._serve_static("../templates/dashboard.html")
+        calls = [c[0][0] for c in handler.send_response.call_args_list]
+        self.assertIn(calls[0], (403, 404))
+        self.assertNotIn(200, calls)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -7,6 +7,7 @@ import subprocess
 import sys
 import textwrap
 import threading
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -1096,11 +1097,6 @@ class TestBatteryCheck:
         mock_run.return_value = MagicMock(stdout="'Battery Power'")
         assert manager._is_on_battery() is True
 
-    def test_battery_check_disabled(self, manager):
-        """_check_battery does nothing when pause_on_battery is False."""
-        manager.state["pause_on_battery"] = False
-        manager._check_battery()  # should not raise
-
 
 # ===========================================================================
 # Crash Backoff
@@ -1202,3 +1198,140 @@ class TestTransferQueue:
         # Process should mark first as completed, try to start second
         manager.queue_process_next()
         assert manager.queue[0]["status"] == "completed"
+
+
+# ===========================================================================
+# Queue Processing
+# ===========================================================================
+
+
+class TestQueueProcessing:
+    def test_queue_process_next_empty_queue(self, manager):
+        """queue_process_next returns error when the queue is empty."""
+        manager.queue = []
+        result = manager.queue_process_next()
+        assert result["ok"] is False
+        assert "empty" in result["msg"].lower()
+
+    @patch("subprocess.Popen")
+    @patch("os.path.exists", return_value=True)
+    def test_queue_process_next_starts_transfer(self, mock_exists, mock_popen, manager):
+        """queue_process_next starts the next queued transfer."""
+        mock_proc = MagicMock()
+        mock_proc.pid = 8888
+        mock_popen.return_value = mock_proc
+
+        manager.queue = [
+            {
+                "source": "/tmp/a",
+                "dest": "/tmp/b",
+                "source_type": "local",
+                "dest_type": "local",
+                "status": "queued",
+            }
+        ]
+        result = manager.queue_process_next()
+        assert result["ok"] is True
+        assert manager.queue[0]["status"] == "running"
+
+    def test_background_scanner_is_daemon(self, manager):
+        """background_scanner thread can be set as daemon."""
+        t = threading.Thread(target=manager.background_scanner, daemon=True)
+        assert t.daemon is True
+        # Do NOT start the thread (it loops forever)
+
+    @patch("time.sleep", side_effect=StopIteration)
+    def test_scanner_runs_periodically(self, mock_sleep, manager):
+        """background_scanner calls scan_full_log at least once per loop."""
+        manager.scan_full_log = MagicMock()
+        manager._check_schedule = MagicMock()
+        manager._check_battery = MagicMock()
+        manager.queue_process_next = MagicMock()
+
+        try:
+            manager.background_scanner()
+        except StopIteration:
+            pass
+
+        manager.scan_full_log.assert_called()
+
+
+# ===========================================================================
+# OneDrive Detection
+# ===========================================================================
+
+
+class TestOneDriveDetection:
+    @patch("cloudhop.transfer.remote_exists", return_value=False)
+    @patch("subprocess.run")
+    def test_onedrive_with_drive_id_present(self, mock_run, mock_exists, manager):
+        """When drive_id is already in config dump, rclone backend drives is not called."""
+        mock_run.side_effect = [
+            # Call 1: rclone config create
+            MagicMock(returncode=0, stderr="", stdout=""),
+            # Call 2: rclone config dump (drive_id already present)
+            MagicMock(
+                returncode=0,
+                stderr="",
+                stdout=json.dumps({"od": {"type": "onedrive", "drive_id": "existing123"}}),
+            ),
+        ]
+        result = manager.configure_remote("od", "onedrive")
+        assert result["ok"] is True
+        # Should NOT have called "rclone backend drives"
+        for call in mock_run.call_args_list:
+            cmd = call[0][0]
+            assert "backend" not in cmd
+
+    @patch("cloudhop.transfer.remote_exists", return_value=False)
+    @patch("subprocess.run")
+    def test_onedrive_auto_detect_drive_id(self, mock_run, mock_exists, manager):
+        """OneDrive auto-detects drive_id when not present in config dump."""
+        mock_run.side_effect = [
+            # Call 1: rclone config create
+            MagicMock(returncode=0, stderr="", stdout=""),
+            # Call 2: rclone config dump (no drive_id)
+            MagicMock(
+                returncode=0,
+                stderr="",
+                stdout=json.dumps({"od": {"type": "onedrive"}}),
+            ),
+            # Call 3: rclone backend drives od:
+            MagicMock(
+                returncode=0,
+                stderr="",
+                stdout=json.dumps([{"id": "abc123", "driveType": "personal"}]),
+            ),
+            # Call 4: rclone config update od drive_id=abc123 drive_type=personal
+            MagicMock(returncode=0, stderr="", stdout=""),
+            # Call 5: rclone lsd od: (validation)
+            MagicMock(returncode=0, stderr="", stdout=""),
+        ]
+        result = manager.configure_remote("od", "onedrive")
+        assert result["ok"] is True
+        # Verify that config update was called with drive_id=abc123
+        update_calls = [
+            c for c in mock_run.call_args_list if "config" in c[0][0] and "update" in c[0][0]
+        ]
+        assert len(update_calls) >= 1
+        update_cmd = update_calls[0][0][0]
+        assert "drive_id=abc123" in update_cmd
+
+    @patch("cloudhop.transfer.remote_exists", return_value=False)
+    @patch("subprocess.run")
+    def test_onedrive_malformed_drives_output(self, mock_run, mock_exists, manager):
+        """Malformed rclone backend drives output is handled gracefully."""
+        mock_run.side_effect = [
+            # Call 1: rclone config create
+            MagicMock(returncode=0, stderr="", stdout=""),
+            # Call 2: rclone config dump (no drive_id)
+            MagicMock(
+                returncode=0,
+                stderr="",
+                stdout=json.dumps({"od": {"type": "onedrive"}}),
+            ),
+            # Call 3: rclone backend drives od: (malformed output)
+            MagicMock(returncode=0, stderr="", stdout="invalid json"),
+        ]
+        result = manager.configure_remote("od", "onedrive")
+        assert result["ok"] is True
