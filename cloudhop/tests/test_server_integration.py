@@ -772,3 +772,22 @@ class TestSettingsAPI:
         _fetch(_post(port, "/api/settings", {"email_password": "secret123"}))
         data = _fetch(_get(port, "/api/settings"))
         assert data["email_password"] == ""
+
+
+class TestStaticFileBugFixes:
+    """F112: query params on static files should not cause 404.
+    F108: static files should include Cache-Control header."""
+
+    def test_static_file_with_query_params_returns_200(self, server_fixture):
+        """GET /static/wizard.css?v=123 must return 200, not 404."""
+        port = server_fixture["port"]
+        status, body = _fetch_raw(_get(port, "/static/wizard.css?v=123"))
+        assert status == 200
+        assert len(body) > 0
+
+    def test_static_file_has_cache_control_header(self, server_fixture):
+        """Static file responses must include Cache-Control: no-cache."""
+        port = server_fixture["port"]
+        req = _get(port, "/static/wizard.css")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            assert resp.headers.get("Cache-Control") == "no-cache"
