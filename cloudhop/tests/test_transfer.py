@@ -13,9 +13,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-_POSIX = sys.platform != "win32"
+from cloudhop.transfer import (
+    TransferManager,
+    get_existing_remotes,
+    remote_exists,
+    validate_rclone_cmd,
+)
 
-from cloudhop.transfer import TransferManager, get_existing_remotes, remote_exists, validate_rclone_cmd
+_POSIX = sys.platform != "win32"
 
 # ---------------------------------------------------------------------------
 # Realistic fake rclone log content
