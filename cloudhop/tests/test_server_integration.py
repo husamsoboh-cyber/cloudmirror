@@ -50,9 +50,18 @@ def server_fixture(tmp_path):
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
+    # Wait until the server is actually accepting connections
+    for _attempt in range(30):
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/status", timeout=2):
+                break
+        except Exception:
+            time.sleep(0.1)
+
     yield {"server": server, "port": port, "manager": mgr}
 
     server.shutdown()
+    thread.join(timeout=5)
 
 
 def _get(port: int, path: str, host: str = "localhost") -> urllib.request.Request:
@@ -123,7 +132,12 @@ def _fetch(req: urllib.request.Request, timeout: int = 5) -> Dict[str, Any]:
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 return json.loads(resp.read())
-        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+        except (
+            ConnectionResetError,
+            ConnectionAbortedError,
+            BrokenPipeError,
+            ConnectionRefusedError,
+        ):
             if attempt < _MAX_RETRIES - 1:
                 time.sleep(0.5)
                 req = _rebuild_request(req)
@@ -147,13 +161,23 @@ def _fetch_raw(req: urllib.request.Request, timeout: int = 5):
         except urllib.error.HTTPError as e:
             try:
                 return e.code, e.read()
-            except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+            except (
+                ConnectionResetError,
+                ConnectionAbortedError,
+                BrokenPipeError,
+                ConnectionRefusedError,
+            ):
                 if attempt < _MAX_RETRIES - 1:
                     time.sleep(0.5)
                     req = _rebuild_request(req)
                 else:
                     raise
-        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+        except (
+            ConnectionResetError,
+            ConnectionAbortedError,
+            BrokenPipeError,
+            ConnectionRefusedError,
+        ):
             if attempt < _MAX_RETRIES - 1:
                 time.sleep(0.5)
                 req = _rebuild_request(req)
