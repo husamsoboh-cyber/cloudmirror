@@ -1,6 +1,6 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   *:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-  html { scrollbar-width: none; }
+  html { scrollbar-width: thin; }
   :root {
     --bg: #0c0c0f; --card: #16161a; --card-border: rgba(255,255,255,0.05);
     --text: #ececf1; --text-dim: #a1a1aa; --text-muted: #71717a;
@@ -24,7 +24,10 @@
   [data-theme="light"] .provider-card.selected { background: #eef0ff; }
 
   html, body { overflow-x: hidden; }
-  body::-webkit-scrollbar { width: 0; background: transparent; }
+  ::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.5); }
   body {
     font-family: 'DM Sans', -apple-system, sans-serif;
     background: var(--bg); color: var(--text);
@@ -38,7 +41,7 @@
     inset: 0;
     opacity: var(--noise-opacity);
     pointer-events: none;
-    z-index: 9999;
+    z-index: var(--z-overlay);
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     background-size: 200px;
   }
@@ -53,7 +56,7 @@
     position: fixed; top: 20px; right: 20px;
     background: var(--card); border: 1px solid var(--card-border); border-radius: 10px;
     padding: 6px 10px; cursor: pointer; font-size: 1rem; line-height: 1;
-    color: var(--text); transition: all 0.2s; z-index: 100;
+    color: var(--text); transition: all 0.2s; z-index: var(--z-sticky);
     min-width: 44px; min-height: 44px;
     display: flex; align-items: center; justify-content: center;
   }
@@ -246,3 +249,11 @@
     margin-top: 12px; display: none;
   }
   .local-path-input.show { display: block; }
+
+/* ========== 640px BREAKPOINT ========== */
+@media (max-width: 640px) {
+  body { padding: 12px; }
+  .wizard-title { font-size: 1.6rem; }
+  .wizard-subtitle { font-size: 0.9rem; margin-bottom: 24px; }
+  .wizard-card { padding: 24px 20px; }
+}

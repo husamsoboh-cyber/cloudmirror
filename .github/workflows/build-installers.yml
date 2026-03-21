@@ -21,7 +21,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install pyinstaller
+        run: pip install pyinstaller pywebview
 
       - name: Download rclone
         run: |
@@ -62,7 +62,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install pyinstaller
+        run: pip install pyinstaller pywebview
 
       - name: Download rclone
         run: |

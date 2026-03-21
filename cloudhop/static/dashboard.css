@@ -8,6 +8,12 @@
   --radius-sm: 10px;
   --section-gap: 28px;
   --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --z-base: 1;
+  --z-dropdown: 50;
+  --z-sticky: 100;
+  --z-toast: 200;
+  --z-modal: 500;
+  --z-overlay: 1000;
 }
 
 [data-theme="dark"] {
@@ -93,7 +99,7 @@ body::before {
   inset: 0;
   opacity: var(--noise-opacity);
   pointer-events: none;
-  z-index: 9999;
+  z-index: var(--z-overlay);
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 200px;
 }
@@ -128,7 +134,7 @@ body::before {
 .header {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: var(--z-sticky);
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(16px);
@@ -648,16 +654,17 @@ body::before {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: var(--radius-sm); padding: 10px 20px; font-size: 13px;
-  color: var(--text-primary); z-index: 200; opacity: 0; transition: opacity 0.3s;
+  color: var(--text-primary); z-index: var(--z-toast); opacity: 0; transition: opacity 0.3s;
   pointer-events: none; box-shadow: var(--shadow-lg);
 }
 .toast.show { opacity: 1; }
 
 /* ========== SCROLLBAR ========== */
+html { scrollbar-width: thin; }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--border-hover); }
+::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.5); }
 
 /* ========== LOADING PULSE ========== */
 .loading-pulse {
@@ -678,4 +685,13 @@ body::before {
   .transfer-item { grid-template-columns: 1fr 80px 40px 60px; gap: 6px; padding: 8px 6px; }
   .transfer-item .teta { display: none; }
   .progress-sub-bars { flex-direction: column; }
+}
+@media (max-width: 640px) {
+  .container { padding: 0 16px 40px; }
+  .stat-card { padding: 14px; }
+  .stat-value { font-size: 18px; }
+  .progress-section { padding: 28px 20px 24px; }
+  .progress-percentage { font-size: 56px; }
+  .progress-meta { gap: 16px; font-size: 12px; }
+  .chart-card, .chart-card-full, .active-section, .completed-section, .filetypes-section, .timeline-section { padding: 16px; }
 }

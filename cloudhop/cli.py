@@ -376,12 +376,12 @@ def start_dashboard(manager: TransferManager, start_rclone: bool = False) -> Non
             webview.start()
             _graceful_shutdown(manager)
             return
-        except ImportError:
-            logger.warning("pywebview not installed, falling back to browser")
+        except ImportError as exc:
+            logger.warning("pywebview unavailable (%s), falling back to system browser", exc)
             print("  Tip: pip install pywebview for a native desktop experience")
             print()
-        except Exception as e:
-            logger.error("Native window failed: %s, falling back to browser", e)
+        except Exception as exc:
+            logger.warning("pywebview failed (%s), falling back to system browser", exc)
 
     # Browser mode
     try:
