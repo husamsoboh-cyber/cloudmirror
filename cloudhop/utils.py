@@ -5,9 +5,12 @@
 # Husam and an AI wrote this at 3 AM. DEY TOOK ERR JERBS!
 """
 
+import logging
 import os
 import re
 from typing import List
+
+log = logging.getLogger("cloudhop.utils")
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -111,6 +114,12 @@ RE_SECONDS = re.compile(r"([\d.]+)s")
 # ─── Pure utility functions ───────────────────────────────────────────────────
 
 
+# Allowlist: permits alphanumerics, common path/credential characters,
+# glob wildcards (* ?), and international Unicode.  Dangerous shell
+# metacharacters (; | & ` $ < >) are intentionally excluded.
+_ALLOWED_PATTERN = re.compile(r"^[a-zA-Z0-9._\-:/\\ @!#%^+=(),~'*?\u0080-\uFFFF]+$")
+
+
 def validate_rclone_input(value: str, field_name: str) -> bool:
     """Reject inputs that could be interpreted as rclone flags or SSRF vectors.
 
@@ -120,6 +129,8 @@ def validate_rclone_input(value: str, field_name: str) -> bool:
 
     Backend specifiers like ``:http,url=http://evil.com:`` are also rejected
     because rclone would fetch from the attacker-controlled URL (SSRF).
+
+    A character allowlist provides a second layer of defence after the blocklist.
     """
     if not value:
         return True
@@ -132,6 +143,11 @@ def validate_rclone_input(value: str, field_name: str) -> bool:
     # arbitrary URLs without a pre-configured remote.  Legitimate remote paths
     # always start with a name (e.g. "gdrive:"), never with a bare colon.
     if re.match(r"^:[a-zA-Z]", value):
+        return False
+    # Allowlist: only permit safe characters (including Unicode for
+    # international filenames).
+    if not _ALLOWED_PATTERN.match(value):
+        log.warning("Input rejected by allowlist: contains disallowed characters")
         return False
     return True
 

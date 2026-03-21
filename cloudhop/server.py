@@ -32,7 +32,6 @@ Security model
 - Static files are served with a directory-traversal check (``os.path.realpath``).
 """
 
-import hmac
 import http.server
 import json
 import logging
@@ -42,7 +41,10 @@ import secrets
 import subprocess
 import sys
 import threading
+import time
 from typing import Any, Dict, Optional
+
+from . import __version__
 
 logger = logging.getLogger("cloudhop.server")
 
@@ -66,7 +68,31 @@ from .utils import (
     validate_rclone_input,
 )
 
-CSRF_TOKEN = secrets.token_hex(32)
+_csrf_tokens: Dict[str, float] = {}  # {token_str: expiry_timestamp}
+_csrf_lock = threading.Lock()
+CSRF_TOKEN_LIFETIME = 86400  # 24 hours
+_MAX_CSRF_TOKENS = 100
+
+
+def generate_csrf_token() -> str:
+    """Generate a new CSRF token, store it with expiry, and clean up stale tokens."""
+    token = secrets.token_hex(32)
+    now = time.time()
+    with _csrf_lock:
+        # Cleanup expired tokens
+        expired = [t for t, exp in _csrf_tokens.items() if exp < now]
+        for t in expired:
+            del _csrf_tokens[t]
+        # FIFO cleanup if too many
+        while len(_csrf_tokens) >= _MAX_CSRF_TOKENS:
+            oldest = min(_csrf_tokens, key=_csrf_tokens.get)
+            del _csrf_tokens[oldest]
+        _csrf_tokens[token] = now + CSRF_TOKEN_LIFETIME
+    return token
+
+
+# Initial token (also used by tests that import CSRF_TOKEN directly).
+CSRF_TOKEN = generate_csrf_token()
 
 
 class CloudHopHandler(http.server.BaseHTTPRequestHandler):
@@ -95,9 +121,11 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(data).encode())
 
     def _send_html(self, html: str) -> None:
+        csrf_token = generate_csrf_token()
+        html = html.replace("__VERSION__", __version__)
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
-        self.send_header("Set-Cookie", f"csrf_token={CSRF_TOKEN}; Path=/; SameSite=Strict")
+        self.send_header("Set-Cookie", f"csrf_token={csrf_token}; Path=/; SameSite=Strict")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Cache-Control", "no-store")
@@ -209,11 +237,20 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
     # ── Security checks ─────────────────────────────────────────────────
 
     def _check_csrf(self) -> bool:
-        """Verify CSRF token from X-CSRF-Token header matches the server token."""
+        """Verify CSRF token from X-CSRF-Token header exists in active token store."""
         token = self.headers.get("X-CSRF-Token")
-        if not hmac.compare_digest(token or "", CSRF_TOKEN):
+        if not token:
             self._send_json({"ok": False, "msg": "CSRF token invalid"}, 403)
             return False
+        with _csrf_lock:
+            expiry = _csrf_tokens.get(token)
+            if expiry is None:
+                self._send_json({"ok": False, "msg": "CSRF token invalid"}, 403)
+                return False
+            if time.time() > expiry:
+                del _csrf_tokens[token]
+                self._send_json({"ok": False, "msg": "CSRF token invalid"}, 403)
+                return False
         return True
 
     def _check_host(self) -> bool:
@@ -384,6 +421,8 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                     except Exception:
                         pass
             self._send_json(history)
+        elif self.path == "/favicon.ico":
+            self._serve_static("favicon.svg")
         elif self.path.startswith("/static/"):
             self._serve_static(self.path[8:])  # strip '/static/'
         elif self.path == "/dashboard":
@@ -837,7 +876,7 @@ class CloudHopHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"ok": False, "msg": "Invalid request"}, 400)
                 return
             transfer_id = body.get("id", "")
-            if not transfer_id or not re.match(r"^[0-9a-f]{8}$", transfer_id):
+            if not transfer_id or not re.match(r"^[0-9a-f]{16}$", transfer_id):
                 logger.info("Invalid transfer ID format rejected: %r", transfer_id)
                 self._send_json({"ok": False, "msg": "Invalid transfer ID"}, 400)
                 return

@@ -122,6 +122,28 @@ class TestValidateRcloneInput:
     def test_allows_spaces(self):
         assert validate_rclone_input("remote:My Documents", "source") is True
 
+    # Allowlist tests
+    def test_allows_unicode_path(self):
+        assert validate_rclone_input("remote:文档/照片", "source") is True
+
+    def test_allows_arabic_path(self):
+        assert validate_rclone_input("remote:مستندات", "source") is True
+
+    def test_rejects_backticks(self):
+        assert validate_rclone_input("remote:`whoami`", "source") is False
+
+    def test_rejects_dollar_paren(self):
+        assert validate_rclone_input("remote:$(cat /etc/passwd)", "source") is False
+
+    def test_rejects_semicolon(self):
+        assert validate_rclone_input("remote:path; rm -rf /", "source") is False
+
+    def test_rejects_pipe(self):
+        assert validate_rclone_input("remote:path|cat /etc/passwd", "source") is False
+
+    def test_rejects_ampersand(self):
+        assert validate_rclone_input("remote:path&&malicious", "source") is False
+
 
 # ─── validate_exclude_pattern ─────────────────────────────────────────────────
 

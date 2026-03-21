@@ -122,13 +122,19 @@ const providerIcons = {
 };
 
 // Theme
+function _updateThemeIcons(isLight) {
+  const dark = document.getElementById('theme-icon-dark');
+  const light = document.getElementById('theme-icon-light');
+  if (dark) dark.style.display = isLight ? 'none' : 'block';
+  if (light) light.style.display = isLight ? 'block' : 'none';
+}
 function toggleTheme() {
   const html = document.documentElement;
   const current = html.getAttribute('data-theme');
   const next = current === 'light' ? 'dark' : 'light';
   document.body.style.transition = 'none';
   html.setAttribute('data-theme', next);
-  document.querySelector('.theme-toggle').textContent = next === 'light' ? '\u2600' : '\u263E';
+  _updateThemeIcons(next === 'light');
   localStorage.setItem('cloudhop-theme', next);
   requestAnimationFrame(() => { requestAnimationFrame(() => { document.body.style.transition = ''; }); });
 }
@@ -136,16 +142,16 @@ function toggleTheme() {
   const saved = localStorage.getItem('cloudhop-theme');
   if (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
     document.documentElement.setAttribute('data-theme', 'light');
-    document.querySelector('.theme-toggle').textContent = '\u2600';
+    _updateThemeIcons(true);
   }
   if (saved === 'light') {
     document.documentElement.setAttribute('data-theme', 'light');
-    document.querySelector('.theme-toggle').textContent = '\u2600';
+    _updateThemeIcons(true);
   }
   window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
     if (!localStorage.getItem('cloudhop-theme')) {
       document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
-      document.querySelector('.theme-toggle').textContent = e.matches ? '\u2600' : '\u263E';
+      _updateThemeIcons(e.matches);
     }
   });
 })();

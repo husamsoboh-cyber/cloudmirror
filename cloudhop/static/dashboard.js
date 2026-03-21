@@ -319,7 +319,15 @@ function updateStatusDot(state) {
 
 function $(id) { return document.getElementById(id); }
 function setText(id, val) { const el = $(id); if (el) el.textContent = val; }
-function setHTML(id, val) { const el = $(id); if (el) el.innerHTML = val; }
+function setSafeHTML(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const s = String(val);
+  const clean = s
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/\bon\w+\s*=/gi, 'data-blocked=');
+  el.innerHTML = clean;
+}
 function setDisplay(id, val) { const el = $(id); if (el) el.style.display = val; }
 function setWidth(id, val) { const el = $(id); if (el) el.style.width = val; }
 
@@ -696,9 +704,23 @@ async function refresh() {
         peakSpeedTime = new Date().toLocaleTimeString();
       }
     } else if (d.finished) {
-      document.getElementById('speed').textContent = 'paused';
-      document.getElementById('speed').style.fontSize = '1rem';
-      document.getElementById('speedSub').textContent = 'transfer paused';
+      const isComplete = d.global_pct >= 100 || (!d.rclone_running && d.global_files_total > 0 && d.global_files_done >= d.global_files_total);
+      if (isComplete) {
+        document.getElementById('speed').textContent = 'Complete';
+        document.getElementById('speed').style.fontSize = '1rem';
+        document.getElementById('speed').style.color = 'var(--green, #4caf50)';
+        document.getElementById('speedSub').textContent = 'all files transferred';
+      } else if (speedMbs < 0.01 && d.rclone_running) {
+        document.getElementById('speed').textContent = 'Calculating...';
+        document.getElementById('speed').style.fontSize = '1rem';
+        document.getElementById('speed').style.color = 'var(--text-tertiary)';
+        document.getElementById('speedSub').textContent = '';
+      } else {
+        document.getElementById('speed').textContent = 'Paused';
+        document.getElementById('speed').style.fontSize = '1rem';
+        document.getElementById('speed').style.color = 'var(--orange, #f59e0b)';
+        document.getElementById('speedSub').textContent = 'transfer paused';
+      }
     }
 
     // Avg speed

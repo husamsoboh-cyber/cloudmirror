@@ -46,7 +46,6 @@ Data flow
 """
 
 import copy
-import hashlib
 import json
 import logging
 import os
@@ -332,7 +331,7 @@ class TransferManager:
 
     def set_transfer_paths(self, source: str, dest: str) -> None:
         """Set unique log/state file paths and transfer label."""
-        transfer_id = hashlib.md5(f"{source}:{dest}".encode()).hexdigest()[:8]
+        transfer_id = secrets.token_hex(8)  # 16 hex chars = 64 bits
         log_file = os.path.join(self.cm_dir, f"cloudhop_{transfer_id}.log")
         state_file = os.path.join(self.cm_dir, f"cloudhop_{transfer_id}_state.json")
         src_label = get_remote_label(source)

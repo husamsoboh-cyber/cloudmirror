@@ -199,15 +199,27 @@ class TestStateManagement:
         assert "Google Drive" in manager.transfer_label
         assert "OneDrive" in manager.transfer_label
 
-    def test_set_transfer_paths_deterministic(self, manager):
-        """Same source/dest always produce the same paths."""
+    def test_set_transfer_paths_uses_random_id(self, manager):
+        """Each call generates a unique random transfer ID (64-bit)."""
         manager.set_transfer_paths("mega:stuff", "/tmp/local")
         log1 = manager.log_file
         state1 = manager.state_file
 
         manager.set_transfer_paths("mega:stuff", "/tmp/local")
-        assert manager.log_file == log1
-        assert manager.state_file == state1
+        # Random IDs: each call produces different paths
+        assert manager.log_file != log1
+        assert manager.state_file != state1
+
+    def test_transfer_id_is_16_hex_chars(self, manager):
+        """Transfer ID should be 16 hex characters (64 bits)."""
+        import re
+
+        manager.set_transfer_paths("gdrive:test", "onedrive:test")
+        # Extract the transfer ID from the log filename
+        filename = os.path.basename(manager.log_file)
+        # Format: cloudhop_<id>.log
+        tid = filename.replace("cloudhop_", "").replace(".log", "")
+        assert re.match(r"^[0-9a-f]{16}$", tid), f"Transfer ID {tid!r} is not 16 hex chars"
 
 
 # ===========================================================================
