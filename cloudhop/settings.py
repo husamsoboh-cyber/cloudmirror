@@ -2,6 +2,11 @@
 
 Saves and loads user-configurable settings (e.g. email notifications).
 Persistence: ``~/.cloudhop/settings.json`` (thread-safe via ``threading.Lock``).
+
+Security note (S504): The SMTP password is stored in plaintext in the settings
+file.  The file is created with mode 0o600 (owner read/write only) and the
+password is redacted from API responses (``load_settings``).  Keychain/keyring
+integration may be added in a future release.
 """
 
 import json
