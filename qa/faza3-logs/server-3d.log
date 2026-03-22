@@ -1,0 +1,52 @@
+2026-03-22 01:06:43,064 [INFO] cloudhop: CloudHop server starting (log: /Users/husamsoboh/.cloudhop/cloudhop-server.log)
+2026-03-22 01:06:43,064 [INFO] cloudhop: Platform: Darwin, Python: 3.9.6
+2026-03-22 01:06:43,071 [INFO] cloudhop: Server listening on http://localhost:8789
+2026-03-22 01:07:18,970 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/e2e-screenshots (exists=True, is_dir=True)
+2026-03-22 01:07:26,119 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/e2e-screenshots (exists=True, is_dir=True)
+2026-03-22 01:07:35,775 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/e2e-screenshots (exists=True, is_dir=True)
+2026-03-22 01:07:46,384 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/e2e-screenshots (exists=True, is_dir=True)
+2026-03-22 01:07:51,891 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/e2e-screenshots (exists=True, is_dir=True)
+2026-03-22 01:08:01,985 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/e2e-screenshots (exists=True, is_dir=True)
+2026-03-22 01:08:16,931 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/e2e-screenshots (exists=True, is_dir=True)
+2026-03-22 01:08:50,468 [INFO] cloudhop.server: Starting transfer: /Users/husamsoboh/Desktop/e2e-screenshots -> gdrive:e2e-3d-test1
+2026-03-22 01:08:50,468 [INFO] cloudhop.transfer: Transfer mode: copy
+2026-03-22 01:08:50,469 [INFO] cloudhop.transfer: RC API auth configured on port 44531
+2026-03-22 01:08:50,474 [INFO] cloudhop.transfer: Transfer started (PID 62737), marked just_started
+2026-03-22 01:08:50,474 [INFO] cloudhop.server: Transfer started (PID 62737)
+2026-03-22 01:09:21,402 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/01.11.2023 (exists=True, is_dir=True)
+2026-03-22 01:09:43,093 [INFO] cloudhop.transfer: Sending macOS notification: CloudHop: Transfer Complete
+2026-03-22 01:09:49,469 [INFO] cloudhop.server: Starting transfer: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/01.11.2023 -> onedrive:3d-test2
+2026-03-22 01:09:49,469 [INFO] cloudhop.transfer: Transfer mode: copy
+2026-03-22 01:09:49,470 [INFO] cloudhop.transfer: RC API auth configured on port 34311
+2026-03-22 01:09:49,474 [INFO] cloudhop.transfer: Transfer started (PID 62803), marked just_started
+2026-03-22 01:09:49,475 [INFO] cloudhop.server: Transfer started (PID 62803)
+2026-03-22 01:10:13,243 [INFO] cloudhop.transfer: Log file truncated, resetting scan offset
+2026-03-22 01:10:13,247 [INFO] cloudhop.transfer: Sending macOS notification: CloudHop: Transfer Complete
+2026-03-22 01:11:44,619 [INFO] cloudhop.server: Starting transfer: /Users/husamsoboh/Desktop/e2e-screenshots -> gdrive:e2e-3d-close
+2026-03-22 01:11:44,620 [INFO] cloudhop.transfer: Transfer mode: copy
+2026-03-22 01:11:44,620 [INFO] cloudhop.transfer: RC API auth configured on port 13844
+2026-03-22 01:11:44,625 [INFO] cloudhop.transfer: Transfer started (PID 62841), marked just_started
+2026-03-22 01:11:44,625 [INFO] cloudhop.server: Transfer started (PID 62841)
+2026-03-22 01:12:43,413 [INFO] cloudhop.transfer: Sending macOS notification: CloudHop: Transfer Complete
+2026-03-22 01:14:57,177 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/e2e-screenshots (exists=True, is_dir=True)
+2026-03-22 01:18:12,283 [INFO] cloudhop.server: Starting transfer: /Users/husamsoboh/Desktop/e2e-screenshots -> gdrive:e2e-3d-rapid1
+2026-03-22 01:18:12,284 [INFO] cloudhop.transfer: Transfer mode: copy
+2026-03-22 01:18:12,284 [INFO] cloudhop.transfer: RC API auth configured on port 37165
+2026-03-22 01:18:12,289 [INFO] cloudhop.transfer: Transfer started (PID 62999), marked just_started
+2026-03-22 01:18:12,289 [INFO] cloudhop.server: Transfer started (PID 62999)
+2026-03-22 01:18:13,596 [INFO] cloudhop.transfer: Log file truncated, resetting scan offset
+2026-03-22 01:19:13,613 [INFO] cloudhop.transfer: Sending macOS notification: CloudHop: Transfer Complete
+2026-03-22 01:20:11,550 [INFO] cloudhop.server: Starting transfer: /Users/husamsoboh/Desktop/e2e-screenshots -> gdrive:e2e-3d-rapid2
+2026-03-22 01:20:11,551 [INFO] cloudhop.transfer: Transfer mode: copy
+2026-03-22 01:20:11,552 [INFO] cloudhop.transfer: RC API auth configured on port 11298
+2026-03-22 01:20:11,555 [INFO] cloudhop.transfer: Transfer started (PID 63049), marked just_started
+2026-03-22 01:20:11,555 [INFO] cloudhop.server: Transfer started (PID 63049)
+2026-03-22 01:20:13,770 [INFO] cloudhop.transfer: Log file truncated, resetting scan offset
+2026-03-22 01:21:13,789 [INFO] cloudhop.transfer: Sending macOS notification: CloudHop: Transfer Complete
+2026-03-22 01:21:49,501 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/e2e-screenshots (exists=True, is_dir=True)
+2026-03-22 01:22:05,618 [INFO] cloudhop.server: Validate-path blocked: path /tmp/cloudhop-fix/qa/faza3d-screenshots is outside home directory
+2026-03-22 01:22:59,900 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/test-preset-39 (exists=True, is_dir=True)
+2026-03-22 01:23:38,136 [INFO] cloudhop.presets: Preset saved: 3D-deleted-source (9c90f139c15f3394)
+2026-03-22 01:24:10,467 [INFO] cloudhop.presets: Running preset: 3D-deleted-source (9c90f139c15f3394)
+2026-03-22 01:24:13,966 [INFO] cloudhop.transfer: Sending macOS notification: CloudHop: Transfer Complete
+2026-03-22 01:24:47,569 [INFO] cloudhop.settings: Settings saved
