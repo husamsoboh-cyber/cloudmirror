@@ -1793,6 +1793,27 @@ class TransferManager:
             self.state["_resume_files_offset"] = prev_files
         self.save_state()
         logger.info("[F306] Resume with offset: files=%d, bytes=%d", prev_files, prev_bytes)
+
+        # [FM-10] Regenerate RC API credentials for this session.
+        # The saved command has --rc and --rc-addr but credentials were stripped
+        # for security.  Generate fresh ones so set_bandwidth() can connect.
+        self._rc_user = secrets.token_hex(16)
+        self._rc_pass = secrets.token_hex(16)
+        self._rc_port = self._find_free_port()
+        # Remove stale --rc-addr from saved command, inject fresh credentials
+        self.rclone_cmd = [arg for arg in self.rclone_cmd if not arg.startswith("--rc-addr=")]
+        self.rclone_cmd.extend(
+            [
+                f"--rc-user={self._rc_user}",
+                f"--rc-pass={self._rc_pass}",
+                f"--rc-addr=127.0.0.1:{self._rc_port}",
+            ]
+        )
+        # Ensure --rc flag is present (it should be, but guard against edge cases)
+        if "--rc" not in self.rclone_cmd:
+            self.rclone_cmd.append("--rc")
+        logger.info("[FM-10] RC API credentials regenerated on port %d", self._rc_port)
+
         try:
             popen_kwargs = {
                 "stdout": subprocess.DEVNULL,
