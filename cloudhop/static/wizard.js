@@ -106,6 +106,7 @@ let destName = '';
 let destDisplayName = '';
 let selectedSpeed = '8';
 let selectedMode = 'copy';
+let maxReachedStep = 1;
 let existingRemotes = [];
 
 // Multi-select state
@@ -235,6 +236,49 @@ function showConfirmModal(message) {
   });
 }
 
+// F506: Mirror mode confirmation dialog
+function showMirrorConfirm() {
+  return new Promise((resolve) => {
+    if (document.getElementById('_mirror_overlay')) return resolve(false);
+    const overlay = document.createElement('div');
+    overlay.id = '_mirror_overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:400;display:flex;align-items:center;justify-content:center;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--card);border:2px solid rgba(248,113,113,0.4);border-radius:16px;padding:28px 24px;max-width:440px;width:90%;text-align:center;';
+    box.innerHTML = '<div style="font-size:1.1rem;font-weight:700;color:var(--red);margin-bottom:12px;">&#9888; Mirror Mode</div>'
+      + '<div style="font-size:0.9rem;color:var(--text);margin-bottom:16px;line-height:1.6;">Mirror mode will <strong>DELETE</strong> files from destination that don\'t exist in source.<br>Type <strong>MIRROR</strong> to confirm.</div>'
+      + '<input id="_mirrorInput" type="text" autocomplete="off" placeholder="Type MIRROR" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--card-border);background:var(--bg);color:var(--text);font-size:1rem;text-align:center;margin-bottom:16px;box-sizing:border-box;">'
+      + '<div style="display:flex;gap:12px;justify-content:center;">'
+      + '<button id="_mirrorCancel" class="btn btn-secondary" style="padding:10px 24px;border-radius:10px;font-size:0.85rem;cursor:pointer;">Cancel</button>'
+      + '<button id="_mirrorOk" class="btn btn-primary" style="padding:10px 24px;border-radius:10px;font-size:0.85rem;cursor:pointer;opacity:0.5;pointer-events:none;">Confirm</button>'
+      + '</div>';
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    const input = box.querySelector('#_mirrorInput');
+    const okBtn = box.querySelector('#_mirrorOk');
+    input.addEventListener('input', function() {
+      const match = this.value.trim().toUpperCase() === 'MIRROR';
+      okBtn.style.opacity = match ? '1' : '0.5';
+      okBtn.style.pointerEvents = match ? 'auto' : 'none';
+    });
+    function cleanup() { overlay.remove(); document.removeEventListener('keydown', escHandler); }
+    function escHandler(e) { if (e.key === 'Escape') { cleanup(); resolve(false); } }
+    document.addEventListener('keydown', escHandler);
+    box.querySelector('#_mirrorCancel').onclick = () => { cleanup(); resolve(false); };
+    okBtn.onclick = () => {
+      if (input.value.trim().toUpperCase() === 'MIRROR') {
+        console.log('[F506] Sync confirmation required, user typed:', input.value);
+        cleanup();
+        resolve(true);
+      }
+    };
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) { cleanup(); resolve(false); } });
+    input.focus();
+  });
+}
+
 function showStepError(msg) {
   const existing = document.getElementById('_stepError');
   if (existing) existing.remove();
@@ -253,6 +297,11 @@ function showStepError(msg) {
 
 // Navigation
 async function goTo(step) {
+  // F701: Prevent skipping steps via console
+  if (step > maxReachedStep + 1) {
+    console.log('[F701] goTo validation: requested=%d, max_allowed=%d', step, maxReachedStep + 1);
+    return;
+  }
   if (step >= 3 && !sourceProvider) {
     showStepError('Please select a source provider to continue');
     return;
@@ -266,6 +315,18 @@ async function goTo(step) {
     const pathInput = document.getElementById('sourcePathInput');
     const path = pathInput ? pathInput.value.trim() : '';
     if (path) {
+      // F703: Truncate overly long paths
+      if (path.length > 500) {
+        pathInput.value = path.substring(0, 500);
+        console.log('[F703] Path truncated to max length');
+      }
+      // F704: Reject path traversal
+      if (path.includes('..')) {
+        const errEl = document.getElementById('sourcePathError');
+        if (errEl) { errEl.textContent = 'Path cannot contain ".." for security reasons.'; errEl.style.display = 'block'; }
+        console.log('[F704] Path traversal rejected client-side');
+        return;
+      }
       try {
         const vResp = await fetch('/api/wizard/validate-path', {
           method: 'POST',
@@ -377,10 +438,11 @@ async function goTo(step) {
   }
 
   currentStep = step;
+  if (step > maxReachedStep) maxReachedStep = step;
   // Save wizard state to survive page refresh
   try {
     sessionStorage.setItem('cloudhop_wizard', JSON.stringify({
-      step: currentStep, sourceProvider, sourceName, sourceDisplayName,
+      step: currentStep, maxReachedStep, sourceProvider, sourceName, sourceDisplayName,
       destProvider, destName, destDisplayName, selectedSpeed, selectedMode,
       sourcePath: (document.getElementById('sourcePathInput') || {}).value || '',
       destPath: (document.getElementById('destPathInput') || {}).value || '',
@@ -433,6 +495,7 @@ function toggleAdvanced() {
     if (!saved) return;
     const s = JSON.parse(saved);
     if (!s.sourceProvider) return;
+    maxReachedStep = s.maxReachedStep || s.step || 1;
     sourceProvider = s.sourceProvider;
     sourceName = s.sourceName || '';
     sourceDisplayName = s.sourceDisplayName || '';
@@ -1020,7 +1083,7 @@ function buildSummary() {
   const excludes = document.getElementById('excludePatterns').value.trim();
   const bwLimit = document.getElementById('bwLimit').value.trim();
   selectedSpeed = (document.getElementById('parallelTransfers') || {}).value || selectedSpeed || '8';
-  const modeLabels = {'copy': 'Copy', 'sync': 'Sync', 'bisync': 'Two-Way Sync'};
+  const modeLabels = {'copy': 'Copy', 'sync': 'Mirror', 'bisync': 'Two-Way Sync'};
   const useChecksum = document.getElementById('useChecksum').checked;
   const useFastList = document.getElementById('useFastList').checked;
 
@@ -1106,7 +1169,7 @@ function buildSummary() {
   `;
 
   if (selectedMode === 'sync') {
-    card.innerHTML += '<div style="margin-top:10px;padding:10px 14px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);border-radius:8px;font-size:0.8rem;color:var(--red);line-height:1.5;">&#9888; <strong>Warning:</strong> Files in destination not present in source will be permanently deleted.</div>';
+    card.innerHTML += '<div style="margin-top:12px;padding:14px 18px;background:rgba(248,113,113,0.12);border:2px solid rgba(248,113,113,0.4);border-radius:10px;font-size:0.9rem;color:var(--red);line-height:1.6;font-weight:500;">&#9888; <strong>Mirror mode:</strong> Files at destination not in source <strong>WILL be deleted</strong>.</div>';
   } else if (selectedMode === 'bisync') {
     card.innerHTML += '<div style="margin-top:10px;padding:10px 14px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:8px;font-size:0.8rem;color:var(--blue);line-height:1.5;">&#x24D8; First sync may take longer as both sides are compared.</div>';
   }
@@ -1164,6 +1227,7 @@ function getSourcePath() {
   if (sourceProvider === 'local' || sourceProvider === 'icloud') {
     const p = document.getElementById('sourcePathInput').value.trim();
     if (!p) { const errEl = document.getElementById('sourcePathError'); errEl.textContent = 'Please enter a folder path.'; errEl.style.display = 'block'; return null; }
+    if (p.includes('..')) { const errEl = document.getElementById('sourcePathError'); errEl.textContent = 'Path cannot contain ".."'; errEl.style.display = 'block'; console.log('[F704] Path traversal rejected client-side'); return null; }
     document.getElementById('sourcePathError').style.display = 'none';
     return srcSub ? p + '/' + srcSub : p;
   }
@@ -1179,6 +1243,7 @@ function getDestPath() {
   if (destProvider === 'local' || destProvider === 'icloud') {
     const p = document.getElementById('destPathInput').value.trim();
     if (!p) { const errEl = document.getElementById('destPathError'); errEl.textContent = 'Please enter a folder path.'; errEl.style.display = 'block'; return null; }
+    if (p.includes('..')) { const errEl = document.getElementById('destPathError'); errEl.textContent = 'Path cannot contain ".."'; errEl.style.display = 'block'; console.log('[F704] Path traversal rejected client-side'); return null; }
     document.getElementById('destPathError').style.display = 'none';
     return dstSub ? p + '/' + dstSub : p;
   }
@@ -1292,6 +1357,17 @@ async function startTransfer() {
         startTransfer._running = false;
         btn.disabled = false;
         btn.textContent = 'Start Transfer';
+        return;
+      }
+    }
+    // F506: Mirror mode confirmation
+    if (selectedMode === 'sync') {
+      const mirrorConfirmed = await showMirrorConfirm();
+      if (!mirrorConfirmed) {
+        startTransfer._running = false;
+        btn.disabled = false;
+        btn.textContent = (multiSelectedPaths.length > 1 || isMultiDest()) ? 'Start All' : 'Start Transfer';
+        clearTimeout(safetyTimeout);
         return;
       }
     }

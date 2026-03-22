@@ -98,6 +98,7 @@ function stopPolling() {
 
 let peakSpeedVal = 0;
 let peakSpeedTime = '';
+try { const _ps = sessionStorage.getItem('cloudhop_peakSpeed'); if (_ps) { const _pd = JSON.parse(_ps); peakSpeedVal = _pd.val || 0; peakSpeedTime = _pd.time || ''; } } catch(e) {}
 let lastEtaUpdate = 0;
 let lastEtaValue = 0;
 let peakProgressPct = 0;
@@ -322,15 +323,6 @@ function updateStatusDot(state) {
 
 function $(id) { return document.getElementById(id); }
 function setText(id, val) { const el = $(id); if (el) el.textContent = val; }
-function setSafeHTML(id, val) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const s = String(val);
-  const clean = s
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/\bon\w+\s*=/gi, 'data-blocked=');
-  el.innerHTML = clean;
-}
 function setDisplay(id, val) { const el = $(id); if (el) el.style.display = val; }
 function setWidth(id, val) { const el = $(id); if (el) el.style.width = val; }
 
@@ -740,6 +732,8 @@ async function refresh() {
       if (speedMbs > peakSpeedVal) {
         peakSpeedVal = speedMbs;
         peakSpeedTime = new Date().toLocaleTimeString();
+        console.log('[F508] Peak speed updated: %s', fmtSpeed(peakSpeedVal));
+        try { sessionStorage.setItem('cloudhop_peakSpeed', JSON.stringify({val: peakSpeedVal, time: peakSpeedTime})); } catch(e) {}
       }
     } else if (d.finished) {
       const isComplete = d.global_pct >= 100 || (!d.rclone_running && d.global_files_total > 0 && d.global_files_done >= d.global_files_total);
