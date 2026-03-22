@@ -2139,11 +2139,42 @@ class TransferManager:
         # Determine rclone subcommand based on mode
         rclone_subcommand = mode if mode in ("sync", "bisync") else "copy"
 
+        # [F304] Auto-append source folder name when dest is cloud root.
+        # When copying a folder to cloud root (e.g., gdrive:), files would end
+        # up directly in root. Instead, wrap them in a folder matching the
+        # source folder name: gdrive: → gdrive:photos
+        rclone_dest = dest
+        if rclone_subcommand in ("copy", "sync"):
+            _colon_idx = dest.find(":")
+            if _colon_idx != -1:
+                _dest_path = dest[_colon_idx + 1 :]
+                if not _dest_path:
+                    # Dest is cloud root — determine source folder name
+                    _src_folder = ""
+                    if source_type == "local":
+                        if os.path.isdir(source):
+                            _src_folder = os.path.basename(source.rstrip("/\\"))
+                    else:
+                        # Remote source: extract last path component
+                        _src_colon = source.find(":")
+                        if _src_colon != -1:
+                            _src_path = source[_src_colon + 1 :].rstrip("/")
+                            if _src_path:
+                                _src_folder = _src_path.rsplit("/", 1)[-1]
+
+                    if _src_folder:
+                        rclone_dest = f"{dest}{_src_folder}"
+                        logger.info(
+                            "[F304] Auto-appended source folder name to cloud root dest: %s -> %s",
+                            dest,
+                            rclone_dest,
+                        )
+
         self.rclone_cmd = [
             "rclone",
             rclone_subcommand,
             source,
-            dest,
+            rclone_dest,
             f"--transfers={transfers}",
             "--checkers=16",
             f"--log-file={self.log_file}",
