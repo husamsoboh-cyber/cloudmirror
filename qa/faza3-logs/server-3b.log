@@ -1,0 +1,56 @@
+2026-03-22 00:13:54,268 [INFO] cloudhop: CloudHop server starting (log: /Users/husamsoboh/.cloudhop/cloudhop-server.log)
+2026-03-22 00:13:54,268 [INFO] cloudhop: Platform: Darwin, Python: 3.9.6
+2026-03-22 00:13:54,273 [INFO] cloudhop: Server listening on http://localhost:8788
+2026-03-22 00:16:06,779 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/11.08.2023 (exists=True, is_dir=True)
+2026-03-22 00:16:51,729 [INFO] cloudhop.server: Starting transfer: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/11.08.2023 -> onedrive:
+2026-03-22 00:16:51,729 [INFO] cloudhop.transfer: Transfer mode: copy
+2026-03-22 00:16:51,729 [INFO] cloudhop.transfer: RC API auth configured on port 13900
+2026-03-22 00:16:51,734 [INFO] cloudhop.transfer: Transfer started (PID 60131), marked just_started
+2026-03-22 00:16:51,734 [INFO] cloudhop.server: Transfer started (PID 60131)
+2026-03-22 00:17:12,728 [INFO] cloudhop.transfer: Pause requested (PID 60131)
+2026-03-22 00:17:52,693 [INFO] cloudhop.transfer: Resume requested
+2026-03-22 00:17:52,696 [INFO] cloudhop.transfer: Session counter incremented to 2 on resume
+2026-03-22 00:17:52,697 [INFO] cloudhop.transfer: Transfer resumed (PID 60158), marked just_started
+2026-03-22 00:18:24,311 [INFO] cloudhop.transfer: Sending macOS notification: CloudHop: Transfer Failed
+2026-03-22 00:19:03,645 [INFO] cloudhop.transfer: Resume requested
+2026-03-22 00:19:03,649 [INFO] cloudhop.transfer: Session counter incremented to 2 on resume
+2026-03-22 00:19:03,650 [INFO] cloudhop.transfer: Transfer resumed (PID 60723), marked just_started
+2026-03-22 00:19:24,518 [INFO] cloudhop.transfer: Sending macOS notification: CloudHop: Transfer Failed
+2026-03-22 00:20:09,561 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/11.08.2023 (exists=True, is_dir=True)
+2026-03-22 00:20:31,279 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/28.04.2025 (exists=True, is_dir=True)
+2026-03-22 00:21:04,411 [INFO] cloudhop.server: Starting transfer: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/28.04.2025 -> gdrive:
+2026-03-22 00:21:04,412 [INFO] cloudhop.transfer: Transfer mode: copy
+2026-03-22 00:21:04,413 [INFO] cloudhop.transfer: RC API auth configured on port 52357
+2026-03-22 00:21:04,417 [INFO] cloudhop.transfer: Transfer started (PID 60779), marked just_started
+2026-03-22 00:21:04,417 [INFO] cloudhop.server: Transfer started (PID 60779)
+2026-03-22 00:21:24,664 [INFO] cloudhop.transfer: Log file truncated, resetting scan offset
+2026-03-22 00:21:27,755 [INFO] cloudhop.transfer: Bandwidth changed to 1M
+2026-03-22 00:22:08,963 [INFO] cloudhop.transfer: Bandwidth changed to off
+2026-03-22 00:22:54,688 [INFO] cloudhop.transfer: Sending macOS notification: CloudHop: Transfer Failed
+2026-03-22 00:23:00,529 [INFO] cloudhop.transfer: Resume requested
+2026-03-22 00:23:00,532 [INFO] cloudhop.transfer: Session counter incremented to 2 on resume
+2026-03-22 00:23:00,533 [INFO] cloudhop.transfer: Transfer resumed (PID 60821), marked just_started
+2026-03-22 00:24:25,245 [INFO] cloudhop.transfer: Resume requested
+2026-03-22 00:24:25,250 [INFO] cloudhop.transfer: Session counter incremented to 2 on resume
+2026-03-22 00:24:25,252 [INFO] cloudhop.transfer: Transfer resumed (PID 60924), marked just_started
+2026-03-22 00:27:08,446 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/28.04.2025 (exists=True, is_dir=True)
+2026-03-22 00:27:31,880 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/e2e-screenshots (exists=True, is_dir=True)
+2026-03-22 00:29:04,732 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/e2e-screenshots (exists=True, is_dir=True)
+2026-03-22 00:29:23,847 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/01.11.2023 (exists=True, is_dir=True)
+2026-03-22 00:30:00,713 [INFO] cloudhop.server: Starting transfer: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/01.11.2023 -> protondrive:
+2026-03-22 00:30:00,714 [INFO] cloudhop.transfer: Proton Drive: capped transfers to 2 (rate limit protection)
+2026-03-22 00:30:00,714 [INFO] cloudhop.transfer: Transfer mode: copy
+2026-03-22 00:30:00,715 [INFO] cloudhop.transfer: RC API auth configured on port 14502
+2026-03-22 00:30:00,715 [INFO] cloudhop.transfer: Proton Drive: applied rate limit protection flags
+2026-03-22 00:30:00,719 [INFO] cloudhop.transfer: Transfer started (PID 61203), marked just_started
+2026-03-22 00:30:00,719 [INFO] cloudhop.server: Transfer started (PID 61203)
+2026-03-22 00:30:24,922 [INFO] cloudhop.transfer: Log file truncated, resetting scan offset
+2026-03-22 00:32:24,312 [INFO] cloudhop.transfer: Pause requested (PID 61203)
+2026-03-22 00:33:18,814 [INFO] cloudhop.presets: Preset saved: Test Preset QA (9cc15f1c120a6908)
+2026-03-22 00:34:01,582 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/01.11.2023 (exists=True, is_dir=True)
+2026-03-22 00:34:46,996 [INFO] cloudhop.server: Starting transfer: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/01.11.2023 -> fakeremote:
+2026-03-22 00:34:46,997 [INFO] cloudhop.transfer: Transfer mode: copy
+2026-03-22 00:34:46,998 [INFO] cloudhop.transfer: RC API auth configured on port 21448
+2026-03-22 00:34:47,002 [INFO] cloudhop.transfer: Transfer started (PID 61398), marked just_started
+2026-03-22 00:34:47,002 [INFO] cloudhop.server: Transfer started (PID 61398)
+2026-03-22 00:34:54,957 [INFO] cloudhop.transfer: Log file truncated, resetting scan offset

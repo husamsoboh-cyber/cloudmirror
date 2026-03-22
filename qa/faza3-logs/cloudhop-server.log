@@ -1,0 +1,64 @@
+2026-03-21 19:58:07,332 [INFO] cloudhop: CloudHop server starting (log: /Users/husamsoboh/.cloudhop/cloudhop-server.log)
+2026-03-21 19:58:07,332 [INFO] cloudhop: Platform: Darwin, Python: 3.12.13
+2026-03-21 19:58:13,339 [INFO] cloudhop: CloudHop server starting (log: /Users/husamsoboh/.cloudhop/cloudhop-server.log)
+2026-03-21 19:58:13,339 [INFO] cloudhop: Platform: Darwin, Python: 3.12.13
+2026-03-21 21:50:08,299 [INFO] cloudhop: CloudHop server starting (log: /Users/husamsoboh/.cloudhop/cloudhop-server.log)
+2026-03-21 21:50:08,300 [INFO] cloudhop: Platform: Darwin, Python: 3.9.6
+2026-03-21 21:50:08,335 [INFO] cloudhop: Server listening on http://localhost:8787
+2026-03-21 21:50:08,335 [WARNING] cloudhop: pywebview unavailable (No module named 'webview'), falling back to system browser
+2026-03-21 21:51:15,648 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Documents (exists=True, is_dir=True)
+2026-03-21 21:51:27,319 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Documents (exists=True, is_dir=True)
+2026-03-21 21:51:41,561 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Downloads (exists=True, is_dir=True)
+2026-03-21 21:52:10,485 [INFO] cloudhop.server: Preview ETA estimate: ~1 minutes for 731.3 MiB at 10 MB/s
+2026-03-21 21:54:18,913 [INFO] cloudhop: Shutdown signal received: 15
+2026-03-21 22:36:15,635 [INFO] cloudhop: CloudHop server starting (log: /Users/husamsoboh/.cloudhop/cloudhop-server.log)
+2026-03-21 22:36:15,635 [INFO] cloudhop: Platform: Darwin, Python: 3.9.6
+2026-03-21 22:36:15,638 [INFO] cloudhop: Server listening on http://localhost:8787
+2026-03-21 23:31:41,403 [INFO] cloudhop: CloudHop server starting (log: /Users/husamsoboh/.cloudhop/cloudhop-server.log)
+2026-03-21 23:31:41,403 [INFO] cloudhop: Platform: Darwin, Python: 3.9.6
+2026-03-21 23:31:41,407 [INFO] cloudhop: Server listening on http://localhost:8788
+2026-03-21 23:31:59,153 [INFO] cloudhop.server: configure-remote: acquired lock for remote 'dropbox'
+2026-03-21 23:32:02,616 [INFO] cloudhop.server: configure-remote: released lock for remote 'dropbox'
+2026-03-21 23:36:25,468 [INFO] cloudhop: CloudHop server starting (log: /Users/husamsoboh/.cloudhop/cloudhop-server.log)
+2026-03-21 23:36:25,469 [INFO] cloudhop: Platform: Darwin, Python: 3.9.6
+2026-03-21 23:40:51,768 [INFO] cloudhop: CloudHop server starting (log: /Users/husamsoboh/.cloudhop/cloudhop-server.log)
+2026-03-21 23:40:51,768 [INFO] cloudhop: Platform: Darwin, Python: 3.9.6
+2026-03-21 23:40:51,772 [INFO] cloudhop: Server listening on http://localhost:8787
+2026-03-21 23:41:41,161 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/e2e-screenshots (exists=True, is_dir=True)
+2026-03-21 23:42:29,359 [INFO] cloudhop.server: Starting transfer: /Users/husamsoboh/Desktop/e2e-screenshots -> gdrive:
+2026-03-21 23:42:29,360 [INFO] cloudhop.transfer: Transfer mode: copy
+2026-03-21 23:42:29,360 [INFO] cloudhop.transfer: RC API auth configured on port 49623
+2026-03-21 23:42:29,363 [INFO] cloudhop.transfer: Transfer started (PID 59657), marked just_started
+2026-03-21 23:42:29,363 [INFO] cloudhop.server: Transfer started (PID 59657)
+2026-03-21 23:43:51,810 [INFO] cloudhop.transfer: Sending macOS notification: CloudHop: Transfer Complete
+2026-03-21 23:45:16,161 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/e2e-screenshots (exists=True, is_dir=True)
+2026-03-21 23:46:21,976 [INFO] cloudhop.server: Starting transfer: gdrive:e2e-screenshots -> onedrive:
+2026-03-21 23:46:21,977 [INFO] cloudhop.transfer: Transfer mode: copy
+2026-03-21 23:46:21,978 [INFO] cloudhop.transfer: RC API auth configured on port 25647
+2026-03-21 23:46:21,982 [INFO] cloudhop.transfer: Transfer started (PID 59726), marked just_started
+2026-03-21 23:46:21,982 [INFO] cloudhop.server: Transfer started (PID 59726)
+2026-03-21 23:46:51,973 [INFO] cloudhop.transfer: Log file truncated, resetting scan offset
+2026-03-21 23:49:56,326 [INFO] cloudhop.transfer: Pause requested (PID None)
+2026-03-21 23:50:39,546 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/01.11.2023 (exists=True, is_dir=True)
+2026-03-21 23:51:42,793 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/01.11.2023 (exists=True, is_dir=True)
+2026-03-21 23:51:57,911 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/01.11.2023 (exists=True, is_dir=True)
+2026-03-21 23:52:53,611 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/01.11.2023 (exists=True, is_dir=True)
+2026-03-21 23:53:30,176 [INFO] cloudhop.server: Starting transfer: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/01.11.2023 -> dropbox:
+2026-03-21 23:53:30,178 [INFO] cloudhop.transfer: Transfer mode: copy
+2026-03-21 23:53:30,178 [INFO] cloudhop.transfer: RC API auth configured on port 38992
+2026-03-21 23:53:30,182 [INFO] cloudhop.transfer: Transfer started (PID 59810), marked just_started
+2026-03-21 23:53:30,182 [INFO] cloudhop.server: Transfer started (PID 59810)
+2026-03-21 23:53:52,059 [INFO] cloudhop.transfer: Sending macOS notification: CloudHop: Transfer Complete
+2026-03-21 23:54:41,810 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/01.11.2023 (exists=True, is_dir=True)
+2026-03-21 23:55:01,995 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/Soboh Husam - copie.pdf (exists=True, is_dir=False)
+2026-03-21 23:55:25,526 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/e2e-screenshots (exists=True, is_dir=True)
+2026-03-21 23:56:38,160 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/e2e-screenshots (exists=True, is_dir=True)
+2026-03-21 23:56:52,643 [INFO] cloudhop.server: Validate-path blocked: path /tmp/nonexistent12345 is outside home directory
+2026-03-21 23:58:01,792 [INFO] cloudhop.server: Path validated: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/ISTORIC CT (exists=True, is_dir=True)
+2026-03-21 23:58:32,294 [INFO] cloudhop.server: Starting transfer: /Users/husamsoboh/Desktop/ISTORIC SERB MADALINA MONICA - copie/ISTORIC CT -> onedrive:
+2026-03-21 23:58:32,294 [INFO] cloudhop.transfer: Transfer mode: copy
+2026-03-21 23:58:32,296 [INFO] cloudhop.transfer: RC API auth configured on port 15318
+2026-03-21 23:58:32,301 [INFO] cloudhop.transfer: Transfer started (PID 59874), marked just_started
+2026-03-21 23:58:32,301 [INFO] cloudhop.server: Transfer started (PID 59874)
+2026-03-21 23:58:52,284 [INFO] cloudhop.transfer: Log file truncated, resetting scan offset
+2026-03-21 23:59:22,294 [INFO] cloudhop.transfer: Sending macOS notification: CloudHop: Transfer Complete
